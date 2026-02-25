@@ -1,0 +1,9 @@
+service : 
+  - type: web 
+    name: frank_recette
+    env: static
+    buildCommand: flutter build web --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY
+    staticPublishPath: build/web
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
