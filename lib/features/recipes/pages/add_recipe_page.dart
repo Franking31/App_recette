@@ -81,7 +81,7 @@ class _AddRecipePageState extends State<AddRecipePage>
     _cardController.reset();
 
     try {
-      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      const apiKey = String.fromEnvironment('GEMINI_API_KEY');
       if (apiKey.isEmpty) throw Exception('Clé API manquante dans .env');
 
       final prompt = '''

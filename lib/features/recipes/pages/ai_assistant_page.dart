@@ -301,7 +301,7 @@ class _AiAssistantPageState extends State<AiAssistantPage>
       'generationConfig': {'maxOutputTokens': 2048},
     });
 
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    const apiKey = String.fromEnvironment('GEMINI_API_KEY');
     if (apiKey.isEmpty) throw Exception('Clé API manquante dans .env');
 
     final response = await http.post(
