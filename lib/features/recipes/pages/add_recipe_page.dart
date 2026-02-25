@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
+import '../../../core/constants/app_config.dart';
 
 // ─────────────────────────────────────────────
 //  PAGE : RECHERCHE & AJOUT DE RECETTE VIA IA
@@ -80,8 +81,7 @@ class _AddRecipePageState extends State<AddRecipePage>
     _cardController.reset();
 
     try {
-      const apiKey = String.fromEnvironment('GEMINI_API_KEY');
-      if (apiKey.isEmpty) throw Exception('Clé API manquante dans .env');
+      const apiKey = AppConfig.geminiApiKey;
 
       final prompt = '''
 Génère une recette en lien avec : "$query"
@@ -118,7 +118,7 @@ Règles:
 
       final response = await http.post(
         Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey',
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=$apiKey',
         ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
