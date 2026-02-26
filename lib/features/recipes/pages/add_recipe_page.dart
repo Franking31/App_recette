@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
-import '../../../core/constants/app_config.dart';
+import '../../../core/services/gemini_service.dart';
 
 // ─────────────────────────────────────────────
 //  PAGE : RECHERCHE & AJOUT DE RECETTE VIA IA
@@ -81,73 +79,7 @@ class _AddRecipePageState extends State<AddRecipePage>
     _cardController.reset();
 
     try {
-      const apiKey = AppConfig.geminiApiKey;
-
-      final prompt = '''
-Génère une recette en lien avec : "$query"
-
-Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans commentaire, exactement dans ce format :
-{
-  "id": "gen_${DateTime.now().millisecondsSinceEpoch}",
-  "title": "Nom de la recette",
-  "category": "🍽️ Catégorie",
-  "imageUrl": null,
-  "durationMinutes": 30,
-  "servings": 4,
-  "description": "Description courte et appétissante en 1-2 phrases.",
-  "ingredients": [
-    "200g de ...",
-    "3 ..."
-  ],
-  "steps": [
-    "Première étape détaillée.",
-    "Deuxième étape."
-  ]
-}
-
-Règles:
-- title: nom évocateur et précis
-- category: commence toujours par un emoji puis le nom (ex: "🍜 Pâtes")
-- durationMinutes: nombre entier réaliste
-- servings: nombre entier (entre 1 et 12)
-- description: max 150 caractères
-- ingredients: entre 4 et 12 éléments, avec quantités précises
-- steps: entre 3 et 8 étapes claires
-- imageUrl: toujours null
-''';
-
-      final response = await http.post(
-        Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=$apiKey',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': [
-            {
-              'role': 'user',
-              'parts': [{'text': prompt}]
-            }
-          ],
-          'generationConfig': {'maxOutputTokens': 1024},
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      final text = data['candidates'][0]['content']['parts'][0]['text'] as String;
-
-      // Nettoyer et parser le JSON
-      final cleanJson = text
-          .replaceAll(RegExp(r'```json\s*'), '')
-          .replaceAll(RegExp(r'```\s*'), '')
-          .trim();
-
-      final recipeJson = jsonDecode(cleanJson) as Map<String, dynamic>;
-      final recipe = Recipe.fromJson(recipeJson);
-
+      final recipe = await GeminiService.generateRecipe(query);
       setState(() {
         _generatedRecipe = recipe;
         _isLoading = false;

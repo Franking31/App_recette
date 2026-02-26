@@ -1,3 +1,3 @@
 class AppConfig {
-  static const String geminiApiKey = 'AIzaSyBPLvbVrzJBKyBaRpoS6sAXIINEsFfIFdI';
+  static const String geminiApiKey = 'AIzaSyAJNzIMuggkN8OPI0mceOf9_2_uuaFptSo';
 }

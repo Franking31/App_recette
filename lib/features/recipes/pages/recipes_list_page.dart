@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/recipe_card.dart';
+import '../../../core/widgets/app_logo.dart';
+import '../../../app.dart';
 import '../data/dummy_data.dart';
 import '../data/models/recipe.dart';
 import '../pages/ai_assistant_page.dart';
@@ -13,15 +15,27 @@ class RecipesListPage extends StatefulWidget {
   State<RecipesListPage> createState() => _RecipesListPageState();
 }
 
-class _RecipesListPageState extends State<RecipesListPage> {
+class _RecipesListPageState extends State<RecipesListPage>
+    with SingleTickerProviderStateMixin {
   String _searchQuery = '';
   String? _selectedCategory;
   late List<Recipe> _recipes;
+  late AnimationController _fabController;
 
   @override
   void initState() {
     super.initState();
     _recipes = List.from(dummyRecipes);
+    _fabController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _fabController.dispose();
+    super.dispose();
   }
 
   List<String> get _categories {
@@ -44,84 +58,93 @@ class _RecipesListPageState extends State<RecipesListPage> {
     }).toList();
   }
 
+  void _toggleTheme() {
+    final isDark = themeNotifier.value == ThemeMode.dark;
+    themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
+    final textLight = isDark ? AppColors.darkTextLight : AppColors.textLight;
+    final textMedium = isDark ? AppColors.darkTextLight : AppColors.textMedium;
+    final divider = isDark ? AppColors.darkDivider : AppColors.divider;
+
     return Scaffold(
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Bouton + Ajouter une recette
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AddRecipePage(
-                  onRecipeAdded: (recipe) {
-                    setState(() => _recipes.insert(0, recipe));
-                  },
-                ),
-              ),
-            ),
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.4),
-                  width: 1.5,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.cardShadow,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
+          ScaleTransition(
+            scale: CurvedAnimation(parent: _fabController, curve: Curves.easeOutBack),
+            child: GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddRecipePage(
+                    onRecipeAdded: (recipe) =>
+                        setState(() => _recipes.insert(0, recipe)),
                   ),
-                ],
+                ),
               ),
-              child: const Icon(Icons.add_rounded, color: AppColors.primary, size: 28),
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.add_rounded,
+                    color: AppColors.primary, size: 26),
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          // Bouton IA
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AiAssistantPage()),
-            ),
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE8604A), Color(0xFFFF8A65)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE8604A).withValues(alpha: 0.45),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+          const SizedBox(height: 10),
+          ScaleTransition(
+            scale: CurvedAnimation(parent: _fabController, curve: Curves.easeOutBack),
+            child: GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AiAssistantPage()),
               ),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('🤖', style: TextStyle(fontSize: 22)),
-                  Text(
-                    'IA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
+              child: Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('🤖', style: TextStyle(fontSize: 22)),
+                    Text('IA',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        )),
+                  ],
+                ),
               ),
             ),
           ),
@@ -131,50 +154,117 @@ class _RecipesListPageState extends State<RecipesListPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── HEADER ────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
                 children: [
-                  const Text(
-                    '👨‍🍳 Mes Recettes',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_recipes.length} recettes disponibles',
-                    style: const TextStyle(fontSize: 14, color: AppColors.textLight),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
-                        BoxShadow(color: AppColors.cardShadow, blurRadius: 8, offset: Offset(0, 2)),
-                      ],
-                    ),
-                    child: TextField(
-                      onChanged: (v) => setState(() => _searchQuery = v),
-                      decoration: const InputDecoration(
-                        hintText: 'Rechercher une recette...',
-                        hintStyle: TextStyle(color: AppColors.textLight),
-                        prefixIcon: Icon(Icons.search, color: AppColors.textLight),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  AppLogo.full(dark: isDark),
+                  const Spacer(),
+                  // Toggle thème jour/nuit
+                  GestureDetector(
+                    onTap: _toggleTheme,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 54,
+                      height: 30,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.primary.withValues(alpha: 0.8)
+                            : AppColors.divider,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: AnimatedAlign(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        alignment: isDark
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              isDark ? '🌙' : '☀️',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                '${_recipes.length} recettes disponibles',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: textLight,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── BARRE DE RECHERCHE ─────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColors.cardShadow,
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher une recette...',
+                    hintStyle: TextStyle(color: textLight, fontSize: 14),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        color: AppColors.primary, size: 22),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.close_rounded,
+                                color: textLight, size: 18),
+                            onPressed: () => setState(() => _searchQuery = ''),
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── FILTRES ────────────────────────
             SizedBox(
-              height: 38,
+              height: 36,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 scrollDirection: Axis.horizontal,
@@ -183,22 +273,37 @@ class _RecipesListPageState extends State<RecipesListPage> {
                 itemBuilder: (context, i) {
                   final cat = _categories[i];
                   final isSelected = (_selectedCategory ?? 'Tout') == cat;
+                  final catColor = cat == 'Tout'
+                      ? AppColors.primary
+                      : AppColors.categoryColor(cat);
                   return GestureDetector(
                     onTap: () => setState(() => _selectedCategory = cat),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : AppColors.surface,
+                        color: isSelected ? catColor : surface,
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 6)],
+                        border: isSelected
+                            ? null
+                            : Border.all(color: divider, width: 1),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: catColor.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                )
+                              ]
+                            : [],
                       ),
                       child: Text(
                         cat,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: isSelected ? Colors.white : AppColors.textDark,
+                          color: isSelected ? Colors.white : textMedium,
                         ),
                       ),
                     ),
@@ -206,24 +311,47 @@ class _RecipesListPageState extends State<RecipesListPage> {
                 },
               ),
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 10),
+
+            // ── LISTE ──────────────────────────
             Expanded(
               child: _filtered.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('😕', style: TextStyle(fontSize: 48)),
-                          SizedBox(height: 12),
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: Text('😕',
+                                  style: TextStyle(fontSize: 36)),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           Text('Aucune recette trouvée',
-                              style: TextStyle(fontSize: 16, color: AppColors.textLight)),
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: textLight)),
+                          const SizedBox(height: 6),
+                          Text('Essayez un autre mot-clé',
+                              style: TextStyle(
+                                  fontSize: 13, color: textLight)),
                         ],
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 100),
+                      padding: const EdgeInsets.only(bottom: 120),
                       itemCount: _filtered.length,
-                      itemBuilder: (context, i) => RecipeCard(recipe: _filtered[i]),
+                      itemBuilder: (context, i) =>
+                          RecipeCard(recipe: _filtered[i]),
                     ),
             ),
           ],
