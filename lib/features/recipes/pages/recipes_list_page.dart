@@ -391,11 +391,24 @@ class _RecipesListPageState extends State<RecipesListPage>
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 120),
-                      itemCount: _filtered.length,
-                      itemBuilder: (context, i) =>
-                          RecipeCard(recipe: _filtered[i]),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final crossAxisCount = width > 900 ? 3 : width > 600 ? 2 : 2;
+                        final childAspectRatio = width > 900 ? 0.82 : 0.80;
+                        return GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: childAspectRatio,
+                          ),
+                          itemCount: _filtered.length,
+                          itemBuilder: (context, i) =>
+                              RecipeCard(recipe: _filtered[i]),
+                        );
+                      },
                     ),
             ),
           ],

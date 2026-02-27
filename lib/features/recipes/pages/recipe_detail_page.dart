@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
 import '../../../core/services/favorites_service.dart';
+import '../../../core/services/auth_service.dart';
 import 'ai_assistant_page.dart';
 
 class RecipeDetailPage extends StatefulWidget {
@@ -472,6 +473,13 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   }
 
   Future<void> _toggleFavorite() async {
+    // Vérifier connexion AVANT d'essayer
+    if (!AuthService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🔐 Connectez-vous pour sauvegarder vos favoris')),
+      );
+      return;
+    }
     setState(() => _favLoading = true);
     try {
       final added = await FavoritesService.toggleFavorite(widget.recipe);
@@ -479,17 +487,16 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              added ? '❤️ Ajouté aux favoris !' : '💔 Retiré des favoris',
-            ),
+            content: Text(added ? '❤️ Ajouté aux favoris !' : '💔 Retiré des favoris'),
             duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      debugPrint('Favorites error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Connectez-vous pour sauvegarder')),
+          SnackBar(content: Text('Erreur: ${e.toString().replaceAll("Exception: ", "")}')),
         );
       }
     } finally {
