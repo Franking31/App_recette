@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:frank_recette/features/recipes/pages/shopping_list_page.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/favorites_service.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/shopping_service.dart';
-import '../../../core/widgets/app_logo.dart';
 import '../../../app.dart';
 import '../../../core/widgets/recipe_card.dart';
 import '../auth/pages/login_page.dart';
+import '../recipes/pages/shopping_list_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -18,7 +17,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  bool _loadingFavs = true;
+  bool _loading = true;
   List _favorites = [];
   int _aiCount = 0;
   int _shoppingCount = 0;
@@ -30,27 +29,30 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadAll() async {
+    setState(() => _loading = true);
     if (!AuthService.isLoggedIn) {
-      setState(() => _loadingFavs = false);
+      if (mounted) setState(() => _loading = false);
       return;
     }
-    // Charger en parallèle
-    final results = await Future.wait([
-      FavoritesService.getFavorites().catchError((_) => []),
-      ApiService.get('/ai/stats').catchError((_) => {'aiRecipesCount': 0}),
-      ShoppingService.getLists().catchError((_) => []),
-    ]);
-    if (mounted) {
-      setState(() {
-        _favorites = results[0] as List;
-        _aiCount = ((results[1] as Map)['aiRecipesCount'] ?? 0) as int;
-        _shoppingCount = (results[2] as List).length;
-        _loadingFavs = false;
-      });
+    try {
+      final results = await Future.wait([
+        FavoritesService.getFavorites().catchError((_) => <dynamic>[]),
+        ApiService.get('/ai/stats').catchError((_) => <String, dynamic>{'aiRecipesCount': 0}),
+        ShoppingService.getLists().catchError((_) => <ShoppingList>[]),
+      ]);
+      if (mounted) {
+        setState(() {
+          _favorites = results[0] as List;
+          final statsMap = results[1] as Map;
+          _aiCount = (statsMap['aiRecipesCount'] ?? 0) as int;
+          _shoppingCount = (results[2] as List).length;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
-
-  Future<void> _loadFavorites() => _loadAll();
 
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
@@ -59,41 +61,33 @@ class _ProfilePageState extends State<ProfilePage> {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
           backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text('Déconnexion',
               style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: isDark
-                      ? AppColors.darkTextDark
-                      : AppColors.textDark)),
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.darkTextDark : AppColors.textDark)),
           content: Text('Voulez-vous vraiment vous déconnecter ?',
               style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkTextLight
-                      : AppColors.textLight)),
+                  color: isDark ? AppColors.darkTextLight : AppColors.textLight)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuler',
-                  style: TextStyle(color: AppColors.textLight)),
+              child: const Text('Annuler'),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Déconnexion',
-                  style: TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red, foregroundColor: Colors.white),
+              child: const Text('Se déconnecter'),
             ),
           ],
         );
       },
     );
-
-    if (confirm == true) {
-      await AuthService.logout();
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
+    if (confirm != true || !mounted) return;
+    await AuthService.logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginPage()),
         (_) => false,
       );
@@ -111,331 +105,368 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       backgroundColor: bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // ── HEADER ────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Row(
+      appBar: AppBar(
+        backgroundColor: bg,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [BoxShadow(color: AppColors.cardShadow, blurRadius: 6)],
+            ),
+            child: Icon(Icons.arrow_back_ios_new, size: 16, color: textDark),
+          ),
+        ),
+        title: Text('Mon profil',
+            style: TextStyle(
+                fontSize: 20, fontWeight: FontWeight.w800, color: textDark)),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          : RefreshIndicator(
+              onRefresh: _loadAll,
+              color: AppColors.primary,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(
-                          color: surface,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: const [BoxShadow(
-                              color: AppColors.cardShadow, blurRadius: 6)],
-                        ),
-                        child: Icon(Icons.arrow_back_ios_new,
-                            color: textDark, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Text('Mon profil',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: textDark,
-                        )),
-                  ],
-                ),
-              ),
+                    const SizedBox(height: 8),
 
-              const SizedBox(height: 28),
-
-              // ── AVATAR + EMAIL ─────────────
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 20, offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // Avatar
+                    // ── AVATAR CARD ───────────────────────────
                     Container(
-                      width: 64, height: 64,
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          user != null
-                              ? user.email[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text(
-                            user?.email ?? 'Non connecté',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                            width: 64, height: 64,
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
+                              shape: BoxShape.circle,
                             ),
-                            child: const Text('✨ Membre ForkAI',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700)),
+                            child: Center(
+                              child: Text(
+                                user != null ? user.email[0].toUpperCase() : '?',
+                                style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user?.email ?? 'Non connecté',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text('✨ Membre ForkAI',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700)),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-              // ── STATS ─────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    _statCard('❤️', '${_favorites.length}',
-                        'Favoris', surface, textDark, textLight),
-                    const SizedBox(width: 12),
-                    _statCard('🤖', '$_aiCount',
-                        'Recettes IA', surface, textDark, textLight),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => const ShoppingListPage())),
-                      child: _statCard('🛒', '$_shoppingCount',
-                          'Listes courses', surface, textDark, textLight),
+                    // ── STATS ─────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          _StatCard(
+                            emoji: '❤️',
+                            value: '${_favorites.length}',
+                            label: 'Favoris',
+                            isDark: isDark,
+                          ),
+                          const SizedBox(width: 12),
+                          _StatCard(
+                            emoji: '🤖',
+                            value: '$_aiCount',
+                            label: 'Recettes IA',
+                            isDark: isDark,
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const ShoppingListPage())),
+                            child: _StatCard(
+                              emoji: '🛒',
+                              value: '$_shoppingCount',
+                              label: 'Listes courses',
+                              isDark: isDark,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 24),
+                    const SizedBox(height: 28),
 
-              // ── MES FAVORIS ───────────────
-              if (AuthService.isLoggedIn) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      Text('❤️ Mes favoris',
+                    // ── MES FAVORIS ───────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text('❤️ Mes favoris',
                           style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
                               color: textDark)),
-                      const Spacer(),
-                      if (_loadingFavs)
-                        const SizedBox(
-                          width: 16, height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primary),
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (_favorites.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: surface,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: AppColors.cardShadow, blurRadius: 8)
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              const Text('💔',
+                                  style: TextStyle(fontSize: 40)),
+                              const SizedBox(height: 10),
+                              Text('Aucun favori pour le moment',
+                                  style: TextStyle(
+                                      color: textLight,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15)),
+                              const SizedBox(height: 4),
+                              Text(
+                                  'Appuyez sur ❤️ dans une recette pour la sauvegarder',
+                                  style: TextStyle(
+                                      color: textLight, fontSize: 12),
+                                  textAlign: TextAlign.center),
+                            ],
+                          ),
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (_favorites.isEmpty && !_loadingFavs)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 16),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: surface,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      )
+                    else
+                      LayoutBuilder(builder: (ctx, constraints) {
+                        final cols = constraints.maxWidth > 700 ? 3 : 2;
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: cols,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.80,
+                          ),
+                          itemCount: _favorites.length,
+                          itemBuilder: (_, i) =>
+                              RecipeCard(recipe: _favorites[i]),
+                        );
+                      }),
+
+                    const SizedBox(height: 28),
+
+                    // ── ACTIONS ───────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         children: [
-                          const Text('💔',
-                              style: TextStyle(fontSize: 36)),
-                          const SizedBox(height: 8),
-                          Text('Aucun favori pour le moment',
-                              style: TextStyle(
-                                  color: textLight,
-                                  fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text(
-                              'Appuyez sur ❤️ dans une recette pour la sauvegarder',
-                              style: TextStyle(
-                                  color: textLight, fontSize: 12),
-                              textAlign: TextAlign.center),
+                          // Toggle thème
+                          ValueListenableBuilder<ThemeMode>(
+                            valueListenable: themeNotifier,
+                            builder: (_, mode, __) {
+                              final isDarkMode = mode == ThemeMode.dark;
+                              return _ActionTile(
+                                icon: isDarkMode
+                                    ? Icons.light_mode_rounded
+                                    : Icons.dark_mode_rounded,
+                                label: isDarkMode ? 'Mode clair' : 'Mode sombre',
+                                surface: surface,
+                                textDark: textDark,
+                                textLight: textLight,
+                                onTap: () {
+                                  themeNotifier.value = isDarkMode
+                                      ? ThemeMode.light
+                                      : ThemeMode.dark;
+                                },
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Déconnexion
+                          _ActionTile(
+                            icon: Icons.logout_rounded,
+                            label: 'Se déconnecter',
+                            surface: surface,
+                            textDark: Colors.red,
+                            textLight: Colors.red.withValues(alpha: 0.6),
+                            iconColor: Colors.red,
+                            onTap: _logout,
+                          ),
                         ],
                       ),
                     ),
-                  )
-                else
-                  LayoutBuilder(builder: (context, constraints) {
-                    final cols = constraints.maxWidth > 900 ? 3 : 2;
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      gridDelegate:
-                          SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: cols,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.80,
-                      ),
-                      itemCount: _favorites.length,
-                      itemBuilder: (_, i) =>
-                          RecipeCard(recipe: _favorites[i]),
-                    );
-                  }),
-              ],
 
-              const SizedBox(height: 24),
+                    const SizedBox(height: 32),
 
-              // ── ACTIONS ───────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    // Toggle thème
-                    ValueListenableBuilder(
-                      valueListenable: themeNotifier,
-                      builder: (_, mode, __) {
-                        final isDarkMode = mode == ThemeMode.dark;
-                        return _actionTile(
-                          icon: isDarkMode
-                              ? Icons.light_mode_rounded
-                              : Icons.dark_mode_rounded,
-                          label: isDarkMode ? 'Mode clair' : 'Mode sombre',
-                          surface: surface,
-                          textDark: textDark,
-                          textLight: textLight,
-                          onTap: () {
-                            themeNotifier.value = isDarkMode
-                                ? ThemeMode.light
-                                : ThemeMode.dark;
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    // Déconnexion
-                    _actionTile(
-                      icon: Icons.logout_rounded,
-                      label: 'Se déconnecter',
-                      surface: surface,
-                      textDark: Colors.red,
-                      textLight: Colors.red.withValues(alpha: 0.6),
-                      iconColor: Colors.red,
-                      onTap: _logout,
+                    Center(
+                      child: Text('ForkAI v1.0.0',
+                          style: TextStyle(fontSize: 11, color: textLight)),
                     ),
                   ],
                 ),
               ),
+            ),
+    );
+  }
+}
 
-              const SizedBox(height: 32),
+// ─────────────────────────────────────────────
+//  Stat Card — widget indépendant
+// ─────────────────────────────────────────────
+class _StatCard extends StatelessWidget {
+  final String emoji;
+  final String value;
+  final String label;
+  final bool isDark;
 
-              // ── VERSION ───────────────────
-              Text('ForkAI v1.0.0',
-                  style: TextStyle(fontSize: 11, color: textLight)),
-              const SizedBox(height: 20),
-            ],
-          ),
+  const _StatCard({
+    required this.emoji,
+    required this.value,
+    required this.label,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
+    final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
+    final textLight = isDark ? AppColors.darkTextLight : AppColors.textLight;
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(color: AppColors.cardShadow, blurRadius: 8)
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 22)),
+            const SizedBox(height: 4),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: textDark)),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(fontSize: 10, color: textLight),
+                textAlign: TextAlign.center),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _statCard(String emoji, String value, String label,
-      Color surface, Color textDark, Color textLight) =>
-      Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(color: AppColors.cardShadow, blurRadius: 8)
-            ],
-          ),
-          child: Column(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 22)),
-              const SizedBox(height: 4),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: textDark)),
-              Text(label,
-                  style: TextStyle(fontSize: 10, color: textLight),
-                  textAlign: TextAlign.center),
-            ],
-          ),
+// ─────────────────────────────────────────────
+//  Action Tile — widget indépendant
+// ─────────────────────────────────────────────
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color surface;
+  final Color textDark;
+  final Color textLight;
+  final Color? iconColor;
+  final VoidCallback onTap;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.surface,
+    required this.textDark,
+    required this.textLight,
+    this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(color: AppColors.cardShadow, blurRadius: 8)
+          ],
         ),
-      );
-
-  Widget _actionTile({
-    required IconData icon,
-    required String label,
-    required Color surface,
-    required Color textDark,
-    required Color textLight,
-    Color? iconColor,
-    required VoidCallback onTap,
-  }) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: const [
-              BoxShadow(color: AppColors.cardShadow, blurRadius: 6)
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
-              const SizedBox(width: 12),
-              Text(label,
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor ?? AppColors.primary, size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(label,
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: textDark)),
-              const Spacer(),
-              Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: textLight),
-            ],
-          ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 14, color: textLight),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
