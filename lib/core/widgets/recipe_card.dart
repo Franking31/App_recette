@@ -39,8 +39,8 @@ class RecipeCard extends StatelessWidget {
             ),
           ],
         ),
-        child: ClipRect(
-          child: Column(
+        clipBehavior: Clip.hardEdge,
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── IMAGE ────────────────────────
@@ -131,7 +131,6 @@ class RecipeCard extends StatelessWidget {
           ],
         ),
       ),
-      ), 
     );
   }
 
