@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
+import '../../../core/services/gemini_service.dart';
+import '../../../core/services/recipes_service.dart';
+import '../../../core/services/auth_service.dart';
 
 // ─────────────────────────────────────────────
 //  PAGE : RECHERCHE & AJOUT DE RECETTE VIA IA
@@ -22,6 +22,7 @@ class _AddRecipePageState extends State<AddRecipePage>
     with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = false;
+  bool _saving = false;
   Recipe? _generatedRecipe;
   String? _errorMessage;
 
@@ -81,74 +82,7 @@ class _AddRecipePageState extends State<AddRecipePage>
     _cardController.reset();
 
     try {
-      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-      if (apiKey.isEmpty) throw Exception('Clé API manquante dans .env');
-
-      final prompt = '''
-Génère une recette en lien avec : "$query"
-
-Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans commentaire, exactement dans ce format :
-{
-  "id": "gen_${DateTime.now().millisecondsSinceEpoch}",
-  "title": "Nom de la recette",
-  "category": "🍽️ Catégorie",
-  "imageUrl": null,
-  "durationMinutes": 30,
-  "servings": 4,
-  "description": "Description courte et appétissante en 1-2 phrases.",
-  "ingredients": [
-    "200g de ...",
-    "3 ..."
-  ],
-  "steps": [
-    "Première étape détaillée.",
-    "Deuxième étape."
-  ]
-}
-
-Règles:
-- title: nom évocateur et précis
-- category: commence toujours par un emoji puis le nom (ex: "🍜 Pâtes")
-- durationMinutes: nombre entier réaliste
-- servings: nombre entier (entre 1 et 12)
-- description: max 150 caractères
-- ingredients: entre 4 et 12 éléments, avec quantités précises
-- steps: entre 3 et 8 étapes claires
-- imageUrl: toujours null
-''';
-
-      final response = await http.post(
-        Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': [
-            {
-              'role': 'user',
-              'parts': [{'text': prompt}]
-            }
-          ],
-          'generationConfig': {'maxOutputTokens': 1024},
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      final text = data['candidates'][0]['content']['parts'][0]['text'] as String;
-
-      // Nettoyer et parser le JSON
-      final cleanJson = text
-          .replaceAll(RegExp(r'```json\s*'), '')
-          .replaceAll(RegExp(r'```\s*'), '')
-          .trim();
-
-      final recipeJson = jsonDecode(cleanJson) as Map<String, dynamic>;
-      final recipe = Recipe.fromJson(recipeJson);
-
+      final recipe = await GeminiService.generateRecipe(query);
       setState(() {
         _generatedRecipe = recipe;
         _isLoading = false;
@@ -162,13 +96,30 @@ Règles:
     }
   }
 
-  void _confirmAdd() {
-    if (_generatedRecipe == null) return;
-    widget.onRecipeAdded(_generatedRecipe!);
+  Future<void> _confirmAdd() async {
+    if (_generatedRecipe == null || _saving) return;
+    setState(() => _saving = true);
+
+    Recipe recipeToAdd = _generatedRecipe!;
+
+    if (AuthService.isLoggedIn) {
+      try {
+        recipeToAdd = await RecipesService.saveRecipe(
+          _generatedRecipe!,
+          isAiGenerated: true,
+        );
+      } catch (e) {
+        debugPrint('Erreur sauvegarde cloud: $e');
+      }
+    }
+
+    widget.onRecipeAdded(recipeToAdd);
+    if (!mounted) return;
+    setState(() => _saving = false);
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✅ "${_generatedRecipe!.title}" ajoutée !'),
+        content: Text('✅ "${recipeToAdd.title}" ajoutée !'),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -416,33 +367,35 @@ Règles:
       builder: (context, _) {
         final shimmerOpacity =
             0.3 + 0.4 * ((_shimmerController.value * 2 - 1).abs());
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 32),
-            const Text('✨', style: TextStyle(fontSize: 40)),
-            const SizedBox(height: 8),
-            Text(
-              "L'IA génère votre recette…",
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.primary.withValues(alpha: 0.8),
-                fontWeight: FontWeight.w600,
+        return SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 32),
+              const Text('✨', style: TextStyle(fontSize: 40)),
+              const SizedBox(height: 8),
+              Text(
+                "L'IA génère votre recette…",
+                style: TextStyle(
+                  fontSize: 15,
+                  color: AppColors.primary.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            ...[160.0, 24.0, 80.0, 100.0, 80.0].map((h) => Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: Container(
-                    height: h,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: AppColors.textLight.withValues(alpha: shimmerOpacity),
-                      borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 32),
+              ...[160.0, 24.0, 80.0, 100.0, 80.0].map((h) => Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Container(
+                      height: h,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.textLight.withValues(alpha: shimmerOpacity),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                )),
-          ],
+                  )),
+            ],
+          ),
         );
       },
     );
@@ -690,7 +643,7 @@ Règles:
                 Expanded(
                   flex: 2,
                   child: GestureDetector(
-                    onTap: _confirmAdd,
+                    onTap: _saving ? null : _confirmAdd,
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
@@ -708,15 +661,15 @@ Règles:
                           )
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_circle_outline,
+                          const Icon(Icons.add_circle_outline,
                               color: Colors.white, size: 18),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
-                            'Ajouter à mes recettes',
-                            style: TextStyle(
+                            _saving ? 'Sauvegarde...' : 'Ajouter à mes recettes',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
                               fontSize: 14,

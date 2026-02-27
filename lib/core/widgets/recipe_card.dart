@@ -10,19 +10,27 @@ class RecipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
+    final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
+    final textLight = isDark ? AppColors.darkTextLight : AppColors.textLight;
+    final catColor = AppColors.categoryColor(recipe.category);
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => RecipeDetailPage(recipe: recipe)),
       ),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppColors.cardShadow,
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : AppColors.cardShadow,
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -30,7 +38,7 @@ class RecipeCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Image ou couleur placeholder
+            // ── IMAGE ────────────────────────
             ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(20),
@@ -42,68 +50,76 @@ class RecipeCard extends StatelessWidget {
                       width: 110,
                       height: 110,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder(),
+                      errorBuilder: (_, __, ___) => _placeholder(catColor),
                     )
-                  : _placeholder(),
+                  : _placeholder(catColor),
             ),
-            // Contenu
+
+            // ── CONTENU ───────────────────────
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Badge catégorie
+                    // Badge catégorie coloré
                     if (recipe.category != null)
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.3),
+                          color: catColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: catColor.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
                         ),
                         child: Text(
                           recipe.category!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textDark,
+                            color: catColor,
                           ),
                         ),
                       ),
                     const SizedBox(height: 6),
                     Text(
                       recipe.title,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: textDark,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
+                    // Infos temps + personnes
                     Row(
                       children: [
-                        const Icon(Icons.schedule,
-                            size: 14, color: AppColors.textLight),
+                        Icon(Icons.schedule_rounded,
+                            size: 13, color: catColor),
                         const SizedBox(width: 4),
                         Text(
                           '${recipe.durationMinutes} min',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textLight,
+                            fontWeight: FontWeight.w600,
+                            color: textLight,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.people,
-                            size: 14, color: AppColors.textLight),
+                        Icon(Icons.people_rounded,
+                            size: 13, color: catColor),
                         const SizedBox(width: 4),
                         Text(
                           '${recipe.servings} pers.',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textLight,
+                            fontWeight: FontWeight.w600,
+                            color: textLight,
                           ),
                         ),
                       ],
@@ -112,10 +128,20 @@ class RecipeCard extends StatelessWidget {
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.arrow_forward_ios,
-                  size: 14, color: AppColors.textLight),
+
+            // ── FLÈCHE ────────────────────────
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: catColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.arrow_forward_ios_rounded,
+                    size: 13, color: catColor),
+              ),
             ),
           ],
         ),
@@ -123,12 +149,20 @@ class RecipeCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() {
-    return Container(
-      width: 110,
-      height: 110,
-      color: AppColors.primary.withOpacity(0.15),
-      child: const Icon(Icons.restaurant, color: AppColors.primary, size: 36),
-    );
-  }
+  Widget _placeholder(Color catColor) => Container(
+        width: 110,
+        height: 110,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              catColor.withValues(alpha: 0.3),
+              catColor.withValues(alpha: 0.15),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Icon(Icons.restaurant_rounded,
+            color: catColor.withValues(alpha: 0.8), size: 36),
+      );
 }

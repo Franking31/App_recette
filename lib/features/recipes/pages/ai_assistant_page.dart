@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
+import '../../../core/services/gemini_service.dart';
 
 // ─────────────────────────────────────────────
 //  MODES IA
@@ -272,52 +270,27 @@ class _AiAssistantPageState extends State<AiAssistantPage>
   }
 
   Future<String> _callClaudeApi(String userMessage) async {
-    // Construire l'historique de conversation (max 10 derniers messages)
-    final recentMessages = _messages
-        .where((m) => m.isUser || _messages.indexOf(m) > 0)
-        .toList();
-    final history = recentMessages
-        .skip(recentMessages.length > 10 ? recentMessages.length - 10 : 0)
-        .map((m) => {
-              'role': m.isUser ? 'user' : 'model',
-              'parts': [{'text': m.content}],
-            })
+    // Historique (max 10 messages)
+    final recent = _messages
+        .skip(_messages.length > 10 ? _messages.length - 10 : 0)
         .toList();
 
-    // Ajouter le contexte de personnalisation au message
+    // Enrichir avec le contexte de personnalisation
     String enrichedMessage = userMessage;
     if (_selectedDiets.isNotEmpty || _servings != 2) {
       enrichedMessage +=
-          '\n\n[Contexte: ${_servings} personnes, régimes: ${_selectedDiets.isEmpty ? "aucun" : _selectedDiets.join(", ")}, difficulté souhaitée: $_difficulty]';
+          '\n\n[Contexte: $_servings personnes, régimes: ${_selectedDiets.isEmpty ? "aucun" : _selectedDiets.join(", ")}, difficulté: $_difficulty]';
     }
 
-    history.add({'role': 'user', 'parts': [{'text': enrichedMessage}]});
+    final messages = [
+      ...recent.map((m) => {'content': m.content, 'isUser': m.isUser}),
+      {'content': enrichedMessage, 'isUser': true},
+    ];
 
-    final body = jsonEncode({
-      'system_instruction': {
-        'parts': [{'text': _selectedMode.systemPrompt}]
-      },
-      'contents': history,
-      'generationConfig': {'maxOutputTokens': 2048},
-    });
-
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-    if (apiKey.isEmpty) throw Exception('Clé API manquante dans .env');
-
-    final response = await http.post(
-      Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey',
-      ),
-      headers: {'Content-Type': 'application/json'},
-      body: body,
+    return await GeminiService.chat(
+      systemPrompt: _selectedMode.systemPrompt,
+      messages: messages,
     );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      return data['candidates'][0]['content']['parts'][0]['text'] as String;
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.body}');
-    }
   }
 
   void _scrollToBottom() {
