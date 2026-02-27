@@ -3,13 +3,16 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/recipe_card.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../app.dart';
+import '../../profile/profile_page.dart';
 import '../data/dummy_data.dart';
 import '../data/models/recipe.dart';
 import '../pages/ai_assistant_page.dart';
 import '../pages/add_recipe_page.dart';
+import '../pages/shopping_list_page.dart';
 import '../../../core/services/recipes_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/favorites_service.dart';
+
 
 class RecipesListPage extends StatefulWidget {
   const RecipesListPage({super.key});
@@ -47,11 +50,13 @@ class _RecipesListPageState extends State<RecipesListPage>
         FavoritesService.getFavorites(),
       ]);
       final cloudRecipes = results[0] as List<Recipe>;
-      if (cloudRecipes.isNotEmpty && mounted) {
+      if (mounted) {
         setState(() {
-          // Fusionner : recettes cloud + recettes locales non dupliquées
+          // Recettes cloud en premier + dummy locales non dupliquées
           final cloudIds = cloudRecipes.map((r) => r.id).toSet();
-          final localOnly = _recipes.where((r) => !cloudIds.contains(r.id)).toList();
+          final localOnly = dummyRecipes
+              .where((r) => !cloudIds.contains(r.id))
+              .toList();
           _recipes = [...cloudRecipes, ...localOnly];
         });
       }
@@ -113,8 +118,12 @@ class _RecipesListPageState extends State<RecipesListPage>
                 context,
                 MaterialPageRoute(
                   builder: (_) => AddRecipePage(
-                    onRecipeAdded: (recipe) =>
-                        setState(() => _recipes.insert(0, recipe)),
+                    onRecipeAdded: (recipe) {
+                      setState(() => _recipes.insert(0, recipe));
+                      // Recharger depuis cloud pour avoir l'UUID correct
+                      Future.delayed(const Duration(milliseconds: 500),
+                          _loadCloudData);
+                    },
                   ),
                 ),
               ),
@@ -191,6 +200,40 @@ class _RecipesListPageState extends State<RecipesListPage>
                 children: [
                   AppLogo.full(dark: isDark),
                   const Spacer(),
+                  // Bouton courses
+                  GestureDetector(
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ShoppingListPage())),
+                    child: Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: const [BoxShadow(
+                            color: AppColors.cardShadow, blurRadius: 6)],
+                      ),
+                      child: const Center(child: Text('🛒',
+                          style: TextStyle(fontSize: 18))),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Bouton profil
+                  GestureDetector(
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ProfilePage())),
+                    child: Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: const [BoxShadow(
+                            color: AppColors.cardShadow, blurRadius: 6)],
+                      ),
+                      child: Center(child: Icon(Icons.person_rounded,
+                          color: AppColors.primary, size: 20)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   // Toggle thème jour/nuit
                   GestureDetector(
                     onTap: _toggleTheme,
@@ -391,11 +434,24 @@ class _RecipesListPageState extends State<RecipesListPage>
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 120),
-                      itemCount: _filtered.length,
-                      itemBuilder: (context, i) =>
-                          RecipeCard(recipe: _filtered[i]),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final crossAxisCount = width > 900 ? 3 : width > 600 ? 2 : 2;
+                        final childAspectRatio = width > 900 ? 0.82 : 0.80;
+                        return GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: childAspectRatio,
+                          ),
+                          itemCount: _filtered.length,
+                          itemBuilder: (context, i) =>
+                              RecipeCard(recipe: _filtered[i]),
+                        );
+                      },
                     ),
             ),
           ],
