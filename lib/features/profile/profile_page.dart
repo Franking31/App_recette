@@ -225,14 +225,33 @@ class _ProfilePageState extends State<ProfilePage> {
                             isDark: isDark,
                           ),
                           const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: () => Navigator.push(context,
-                                MaterialPageRoute(builder: (_) => const ShoppingListPage())),
-                            child: _StatCard(
-                              emoji: '🛒',
-                              value: '$_shoppingCount',
-                              label: 'Listes courses',
-                              isDark: isDark,
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(context,
+                                  MaterialPageRoute(builder: (_) => const ShoppingListPage())),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppColors.darkSurface : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 8)],
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('🛒', style: TextStyle(fontSize: 22)),
+                                    const SizedBox(height: 4),
+                                    Text('$_shoppingCount',
+                                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900,
+                                            color: isDark ? AppColors.darkTextDark : AppColors.textDark)),
+                                    const SizedBox(height: 2),
+                                    Text('Listes courses',
+                                        style: TextStyle(fontSize: 10,
+                                            color: isDark ? AppColors.darkTextLight : AppColors.textLight),
+                                        textAlign: TextAlign.center),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ],
