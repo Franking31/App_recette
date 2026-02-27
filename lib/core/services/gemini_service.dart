@@ -1,11 +1,6 @@
 import '../../../features/recipes/data/models/recipe.dart';
 import 'api_service.dart';
 
-// ═══════════════════════════════════════════
-//  GEMINI SERVICE — Appels IA via backend
-//  La clé API reste côté serveur !
-// ═══════════════════════════════════════════
-
 class GeminiService {
   // ── Chat IA ────────────────────────────────
   static Future<String> chat({
@@ -19,12 +14,23 @@ class GeminiService {
     return data['reply'] as String;
   }
 
-  // ── Générer une recette ────────────────────
-  static Future<Recipe> generateRecipe(String query) async {
+  // ── Générer UNE recette ────────────────────
+  static Future<Recipe> generateRecipe(String query, {int servings = 4}) async {
     final data = await ApiService.post('/ai/generate-recipe', {
       'query': query,
+      'servings': servings,
     });
-    return Recipe.fromJson(
-        Map<String, dynamic>.from(data['recipe']));
+    return Recipe.fromJson(Map<String, dynamic>.from(data['recipe']));
+  }
+
+  // ── Générer 10 recettes (liste) ────────────
+  static Future<List<Recipe>> generateRecipeList(String query, {int servings = 4}) async {
+    final data = await ApiService.post('/ai/generate-recipe-list', {
+      'query': query,
+      'servings': servings,
+    });
+    return (data['recipes'] as List)
+        .map((r) => Recipe.fromJson(Map<String, dynamic>.from(r)))
+        .toList();
   }
 }
