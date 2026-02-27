@@ -22,16 +22,30 @@ class Recipe {
   });
 
   factory Recipe.fromJson(Map<String, dynamic> json) => Recipe(
-    id: json['id'] as String,
-    title: json['title'] as String,
-    category: json['category'] as String?,
-    imageUrl: json['imageUrl'] as String?,
-    durationMinutes: (json['durationMinutes'] as num).toInt(),
-    servings: (json['servings'] as num).toInt(),
-    description: json['description'] as String? ?? '',
-    ingredients: List<String>.from(json['ingredients'] as List<dynamic>? ?? []),
-    steps: List<String>.from(json['steps'] as List<dynamic>? ?? []),
+    id: (json['id'] ?? '').toString(),
+    title: (json['title'] ?? 'Sans titre').toString(),
+    category: json['category']?.toString(),
+    imageUrl: json['imageUrl']?.toString(),
+    durationMinutes: _toInt(json['durationMinutes'], 30),
+    servings: _toInt(json['servings'], 4),
+    description: (json['description'] ?? '').toString(),
+    ingredients: _toStringList(json['ingredients']),
+    steps: _toStringList(json['steps']),
   );
+
+  static int _toInt(dynamic v, int fallback) {
+    if (v == null) return fallback;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
+  }
+
+  static List<String> _toStringList(dynamic v) {
+    if (v == null) return [];
+    if (v is List) return v.map((e) => e?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+    return [];
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
