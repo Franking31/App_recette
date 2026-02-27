@@ -7,6 +7,9 @@ import '../data/dummy_data.dart';
 import '../data/models/recipe.dart';
 import '../pages/ai_assistant_page.dart';
 import '../pages/add_recipe_page.dart';
+import '../../../core/services/recipes_service.dart';
+import '../../../core/services/auth_service.dart';
+import '../../../core/services/favorites_service.dart';
 
 class RecipesListPage extends StatefulWidget {
   const RecipesListPage({super.key});
@@ -21,6 +24,7 @@ class _RecipesListPageState extends State<RecipesListPage>
   String? _selectedCategory;
   late List<Recipe> _recipes;
   late AnimationController _fabController;
+  bool _cloudLoading = false;
 
   @override
   void initState() {
@@ -30,6 +34,32 @@ class _RecipesListPageState extends State<RecipesListPage>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     )..forward();
+    _loadCloudData();
+  }
+
+  Future<void> _loadCloudData() async {
+    if (!AuthService.isLoggedIn) return;
+    setState(() => _cloudLoading = true);
+    try {
+      // Charger recettes cloud + favoris en parallèle
+      final results = await Future.wait([
+        RecipesService.getMyRecipes(),
+        FavoritesService.getFavorites(),
+      ]);
+      final cloudRecipes = results[0] as List<Recipe>;
+      if (cloudRecipes.isNotEmpty && mounted) {
+        setState(() {
+          // Fusionner : recettes cloud + recettes locales non dupliquées
+          final cloudIds = cloudRecipes.map((r) => r.id).toSet();
+          final localOnly = _recipes.where((r) => !cloudIds.contains(r.id)).toList();
+          _recipes = [...cloudRecipes, ...localOnly];
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur chargement cloud: $e');
+    } finally {
+      if (mounted) setState(() => _cloudLoading = false);
+    }
   }
 
   @override
@@ -211,13 +241,27 @@ class _RecipesListPageState extends State<RecipesListPage>
             const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                '${_recipes.length} recettes disponibles',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: textLight,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Row(
+                children: [
+                  Text(
+                    '${_recipes.length} recettes disponibles',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textLight,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (_cloudLoading) ...[
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 12, height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
 

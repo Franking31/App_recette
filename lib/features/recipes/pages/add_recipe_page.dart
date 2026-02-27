@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
 import '../../../core/services/gemini_service.dart';
+import '../../../core/services/recipes_service.dart';
+import '../../../core/services/auth_service.dart';
 
 // ─────────────────────────────────────────────
 //  PAGE : RECHERCHE & AJOUT DE RECETTE VIA IA
@@ -20,6 +22,7 @@ class _AddRecipePageState extends State<AddRecipePage>
     with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = false;
+  bool _saving = false;
   Recipe? _generatedRecipe;
   String? _errorMessage;
 
@@ -93,13 +96,30 @@ class _AddRecipePageState extends State<AddRecipePage>
     }
   }
 
-  void _confirmAdd() {
-    if (_generatedRecipe == null) return;
-    widget.onRecipeAdded(_generatedRecipe!);
+  Future<void> _confirmAdd() async {
+    if (_generatedRecipe == null || _saving) return;
+    setState(() => _saving = true);
+
+    Recipe recipeToAdd = _generatedRecipe!;
+
+    if (AuthService.isLoggedIn) {
+      try {
+        recipeToAdd = await RecipesService.saveRecipe(
+          _generatedRecipe!,
+          isAiGenerated: true,
+        );
+      } catch (e) {
+        debugPrint('Erreur sauvegarde cloud: $e');
+      }
+    }
+
+    widget.onRecipeAdded(recipeToAdd);
+    if (!mounted) return;
+    setState(() => _saving = false);
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✅ "${_generatedRecipe!.title}" ajoutée !'),
+        content: Text('✅ "${recipeToAdd.title}" ajoutée !'),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -347,33 +367,35 @@ class _AddRecipePageState extends State<AddRecipePage>
       builder: (context, _) {
         final shimmerOpacity =
             0.3 + 0.4 * ((_shimmerController.value * 2 - 1).abs());
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 32),
-            const Text('✨', style: TextStyle(fontSize: 40)),
-            const SizedBox(height: 8),
-            Text(
-              "L'IA génère votre recette…",
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.primary.withValues(alpha: 0.8),
-                fontWeight: FontWeight.w600,
+        return SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 32),
+              const Text('✨', style: TextStyle(fontSize: 40)),
+              const SizedBox(height: 8),
+              Text(
+                "L'IA génère votre recette…",
+                style: TextStyle(
+                  fontSize: 15,
+                  color: AppColors.primary.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            ...[160.0, 24.0, 80.0, 100.0, 80.0].map((h) => Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: Container(
-                    height: h,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: AppColors.textLight.withValues(alpha: shimmerOpacity),
-                      borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 32),
+              ...[160.0, 24.0, 80.0, 100.0, 80.0].map((h) => Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Container(
+                      height: h,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.textLight.withValues(alpha: shimmerOpacity),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                )),
-          ],
+                  )),
+            ],
+          ),
         );
       },
     );
@@ -621,7 +643,7 @@ class _AddRecipePageState extends State<AddRecipePage>
                 Expanded(
                   flex: 2,
                   child: GestureDetector(
-                    onTap: _confirmAdd,
+                    onTap: _saving ? null : _confirmAdd,
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
@@ -639,15 +661,15 @@ class _AddRecipePageState extends State<AddRecipePage>
                           )
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_circle_outline,
+                          const Icon(Icons.add_circle_outline,
                               color: Colors.white, size: 18),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
-                            'Ajouter à mes recettes',
-                            style: TextStyle(
+                            _saving ? 'Sauvegarde...' : 'Ajouter à mes recettes',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
