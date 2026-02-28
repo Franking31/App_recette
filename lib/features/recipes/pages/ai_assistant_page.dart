@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
 import '../../../core/services/gemini_service.dart';
+import '../../../core/services/api_service.dart';
+import '../../../core/services/auth_service.dart';
+import 'conversations_history_page.dart';
+import 'photo_recipe_page.dart';
+import 'substitute_page.dart';
+import 'meal_plan_page.dart';
+import 'nutrition_page.dart';
 
 // ─────────────────────────────────────────────
 //  MODES IA
@@ -15,6 +22,8 @@ enum AiMode {
   nutrition,
   creative,
   chat,
+  photoRecipe,
+  substitute,
 }
 
 extension AiModeInfo on AiMode {
@@ -28,6 +37,8 @@ extension AiModeInfo on AiMode {
       case AiMode.nutrition:    return 'Nutrition & Macros';
       case AiMode.creative:     return 'Mode créatif';
       case AiMode.chat:         return 'Assistant cuisine';
+      case AiMode.photoRecipe:  return 'Photo → Recette';
+      case AiMode.substitute:   return 'Substitution';
     }
   }
 
@@ -41,6 +52,8 @@ extension AiModeInfo on AiMode {
       case AiMode.nutrition:    return '📊';
       case AiMode.creative:     return '🎨';
       case AiMode.chat:         return '👨‍🍳';
+      case AiMode.photoRecipe:  return '📸';
+      case AiMode.substitute:   return '🔄';
     }
   }
 
@@ -62,6 +75,10 @@ extension AiModeInfo on AiMode {
         return 'Ex: Je regarde Stranger Things et j\'ai envie d\'un plat américain années 80…';
       case AiMode.chat:
         return 'Ex: Mes pâtes ont trop cuit, comment rattraper ça ? Comment faire une béchamel ?';
+      case AiMode.photoRecipe:
+        return 'Photographiez votre frigo ou vos ingrédients...';
+      case AiMode.substitute:
+        return 'Ex: Je n ai pas de creme fraiche, par quoi remplacer ?';
     }
   }
 
@@ -141,6 +158,16 @@ Tu es comme un chef ami disponible à tout moment.
 Aide à: rattraper des erreurs, expliquer des techniques, suggérer des substitutions.
 Sois rassurant, pratique et donne des solutions immédiates.
 Si une étape est en cours, guide pas à pas avec des timings précis.''';
+      case AiMode.photoRecipe:
+        return '''$base
+MODE: Photo → Recette. L'utilisateur a pris une photo de ses ingrédients.
+Tu reçois une liste d'ingrédients détectés et dois proposer des recettes créatives.
+Sois enthousiaste et créatif dans tes suggestions.''';
+      case AiMode.substitute:
+        return '''$base
+MODE: Substitution d'ingrédients.
+Propose des alternatives détaillées avec ratios et impacts sur le résultat.
+Format: pour chaque substitut indique le ratio, l'impact gustatif et le meilleur usage.''';
     }
   }
 
@@ -154,6 +181,8 @@ Si une étape est en cours, guide pas à pas avec des timings précis.''';
       case AiMode.nutrition:    return const Color(0xFF00BCD4);
       case AiMode.creative:     return const Color(0xFFE91E63);
       case AiMode.chat:         return const Color(0xFF795548);
+      case AiMode.photoRecipe:  return const Color(0xFF6C63FF);
+      case AiMode.substitute:   return const Color(0xFF26A69A);
     }
   }
 }
@@ -178,8 +207,15 @@ class ChatMessage {
 // ─────────────────────────────────────────────
 class AiAssistantPage extends StatefulWidget {
   final Recipe? recipeToAnalyze;
+  final String? conversationId;
+  final String? initialMode;
 
-  const AiAssistantPage({super.key, this.recipeToAnalyze});
+  const AiAssistantPage({
+    super.key,
+    this.recipeToAnalyze,
+    this.conversationId,
+    this.initialMode,
+  });
 
   @override
   State<AiAssistantPage> createState() => _AiAssistantPageState();
@@ -192,6 +228,11 @@ class _AiAssistantPageState extends State<AiAssistantPage>
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  bool _loadingHistory = false;
+
+  // Persistance conversation
+  String? _currentConversationId;
+  bool _saving = false;
 
   // Filtres personnalisation
   final List<String> _selectedDiets = [];
@@ -215,10 +256,87 @@ class _AiAssistantPageState extends State<AiAssistantPage>
     if (widget.recipeToAnalyze != null) {
       _selectedMode = AiMode.analyzeRecipe;
       _inputController.text =
-          'Analyse cette recette:\n\n${widget.recipeToAnalyze!.title}\n\nIngrédients: ${widget.recipeToAnalyze!.ingredients.join(", ")}\n\nÉtapes: ${widget.recipeToAnalyze!.steps.join(" | ")}';
+          'Analyse cette recette:\n\n\${widget.recipeToAnalyze!.title}\n\nIngrédients: \${widget.recipeToAnalyze!.ingredients.join(", ")}\n\nÉtapes: \${widget.recipeToAnalyze!.steps.join(" | ")}';
     }
 
-    _addWelcomeMessage();
+    // Charger mode initial si passé depuis l'historique
+    if (widget.initialMode != null) {
+      try {
+        _selectedMode = AiMode.values.firstWhere(
+          (m) => m.name == widget.initialMode,
+          orElse: () => AiMode.chat,
+        );
+      } catch (_) {}
+    }
+
+    // Charger la conversation existante depuis l'historique
+    if (widget.conversationId != null) {
+      _currentConversationId = widget.conversationId;
+      _loadConversation(widget.conversationId!);
+    } else {
+      _addWelcomeMessage();
+    }
+  }
+
+  // ── Charger une conversation depuis Supabase ──
+  Future<void> _loadConversation(String id) async {
+    setState(() => _loadingHistory = true);
+    try {
+      final data = await ApiService.get('/conversations/$id');
+      final conv = data['conversation'];
+      final msgs = (conv['messages'] as List? ?? []);
+      // Restaurer le mode
+      if (conv['mode'] != null) {
+        try {
+          _selectedMode = AiMode.values.firstWhere(
+            (m) => m.name == conv['mode'], orElse: () => AiMode.chat);
+        } catch (_) {}
+      }
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+          for (final m in msgs) {
+            _messages.add(ChatMessage(
+              content: m['content'] ?? '',
+              isUser: m['isUser'] == true,
+            ));
+          }
+          _loadingHistory = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingHistory = false);
+        _addWelcomeMessage();
+      }
+    }
+  }
+
+  // ── Sauvegarder la conversation ───────────────
+  Future<void> _saveConversation() async {
+    if (!AuthService.isLoggedIn || _saving) return;
+    _saving = true;
+    try {
+      final msgs = _messages
+          .where((m) => m.content.isNotEmpty)
+          .map((m) => {'content': m.content, 'isUser': m.isUser})
+          .toList();
+      final title = _messages.isNotEmpty
+          ? _messages.first.content.split('\n').first.substring(
+              0, _messages.first.content.split('\n').first.length.clamp(0, 50))
+          : 'Conversation';
+
+      final body = {
+        'mode': _selectedMode.name,
+        'title': title,
+        'messages': msgs,
+        if (_currentConversationId != null) 'id': _currentConversationId,
+      };
+      final data = await ApiService.post('/conversations', body);
+      _currentConversationId = data['conversation']['id'];
+    } catch (_) {}
+    _saving = false;
   }
 
   void _addWelcomeMessage() {
@@ -255,6 +373,8 @@ class _AiAssistantPageState extends State<AiAssistantPage>
         _messages.add(ChatMessage(content: response, isUser: false));
         _isLoading = false;
       });
+      // Sauvegarder automatiquement la conversation
+      _saveConversation();
     } catch (e) {
       setState(() {
         _messages.add(ChatMessage(
@@ -393,15 +513,25 @@ class _AiAssistantPageState extends State<AiAssistantPage>
               ],
             ),
           ),
-          // Bouton effacer conversation
+          // Bouton historique
+          if (AuthService.isLoggedIn)
+            IconButton(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ConversationsHistoryPage())),
+              icon: const Icon(Icons.history_rounded,
+                  color: AppColors.textLight, size: 22),
+              tooltip: 'Historique',
+            ),
+          // Bouton nouvelle conversation
           IconButton(
             onPressed: () {
               setState(() {
                 _messages.clear();
+                _currentConversationId = null;
                 _addWelcomeMessage();
               });
             },
-            icon: const Icon(Icons.refresh_rounded,
+            icon: const Icon(Icons.add_circle_outline_rounded,
                 color: AppColors.textLight, size: 22),
             tooltip: 'Nouvelle conversation',
           ),
@@ -423,7 +553,30 @@ class _AiAssistantPageState extends State<AiAssistantPage>
           final mode = AiMode.values[i];
           final isSelected = _selectedMode == mode;
           return GestureDetector(
-            onTap: () => setState(() => _selectedMode = mode),
+            onTap: () {
+              // Modes avec page dédiée → redirection directe
+              if (mode == AiMode.photoRecipe) {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const PhotoRecipePage()));
+                return;
+              }
+              if (mode == AiMode.substitute) {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const SubstitutePage()));
+                return;
+              }
+              if (mode == AiMode.mealPlan) {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const MealPlanPage()));
+                return;
+              }
+              if (mode == AiMode.nutrition) {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const NutritionPage()));
+                return;
+              }
+              setState(() => _selectedMode = mode);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -566,6 +719,9 @@ class _AiAssistantPageState extends State<AiAssistantPage>
 
   // ── ZONE DE CHAT ────────────────────────────
   Widget _buildChatArea() {
+    if (_loadingHistory) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

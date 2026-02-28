@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/auth_service.dart';
 import 'ai_assistant_page.dart';
 
 // ═══════════════════════════════════════════
@@ -191,7 +192,10 @@ class _ConversationsHistoryPageState extends State<ConversationsHistoryPage> {
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const AiAssistantPage(),
+                                      builder: (_) => AiAssistantPage(
+                                        conversationId: c['id'] as String,
+                                        initialMode: c['mode'] as String?,
+                                      ),
                                     ),
                                   ).then((_) => _load()),
                                   child: Container(
@@ -256,7 +260,7 @@ class _ConversationsHistoryPageState extends State<ConversationsHistoryPage> {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const AiAssistantPage()),
-        ).then((_) => _load()),
+        ).then((_) => _load()),  // reload after returning
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),

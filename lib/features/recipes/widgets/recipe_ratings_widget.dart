@@ -8,7 +8,35 @@ import '../../../core/services/ratings_service.dart';
 // ═══════════════════════════════════════════
 class RecipeRatingsWidget extends StatefulWidget {
   final String recipeId;
-  const RecipeRatingsWidget({super.key, required this.recipeId});
+  final String recipeTitle; // Pour générer une clé stable basée sur le titre
+
+  const RecipeRatingsWidget({
+    super.key,
+    required this.recipeId,
+    required this.recipeTitle,
+  });
+
+  /// Clé stable = titre normalisé (minuscules, sans accents, sans espaces)
+  /// Permet que tous les utilisateurs partagent les mêmes notes
+  /// même si l'ID local diffère
+  String get stableKey {
+    // Si c'est un UUID Supabase (recette cloud) → on l'utilise directement
+    final uuidRegex = RegExp(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+    if (uuidRegex.hasMatch(recipeId)) return recipeId;
+
+    // Sinon (recette locale/dummy) → clé basée sur le titre normalisé
+    return 'title_' + recipeTitle
+        .toLowerCase()
+        .replaceAll(RegExp(r'[àâä]'), 'a')
+        .replaceAll(RegExp(r'[éèêë]'), 'e')
+        .replaceAll(RegExp(r'[îï]'), 'i')
+        .replaceAll(RegExp(r'[ôö]'), 'o')
+        .replaceAll(RegExp(r'[ùûü]'), 'u')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
 
   @override
   State<RecipeRatingsWidget> createState() => _RecipeRatingsWidgetState();
@@ -38,7 +66,7 @@ class _RecipeRatingsWidgetState extends State<RecipeRatingsWidget> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final result = await RatingsService.getRatings(widget.recipeId);
+    final result = await RatingsService.getRatings(widget.stableKey);
     if (mounted) {
       setState(() {
         _ratings = result.ratings;
@@ -60,7 +88,7 @@ class _RecipeRatingsWidgetState extends State<RecipeRatingsWidget> {
     if (_myRating == 0 || _submitting) return;
     setState(() => _submitting = true);
     await RatingsService.submitRating(
-      recipeId: widget.recipeId,
+      recipeId: widget.stableKey,
       rating: _myRating,
       comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
       userEmail: AuthService.currentUser?.email,
@@ -254,7 +282,7 @@ class _RecipeRatingsWidgetState extends State<RecipeRatingsWidget> {
           ..._ratings.map((r) => _RatingCard(rating: r, isDark: isDark,
               currentUserId: AuthService.currentUser?.userId,
               onDelete: () async {
-                await RatingsService.deleteRating(widget.recipeId);
+                await RatingsService.deleteRating(widget.stableKey);
                 _load();
               })),
       ],
