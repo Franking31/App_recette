@@ -6,6 +6,8 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/shopping_service.dart';
 import 'ai_assistant_page.dart';
+import 'nutrition_page.dart';
+import 'substitute_page.dart';
 import 'shopping_list_page.dart';
 import 'conversations_history_page.dart';
 import '../../../core/services/ratings_service.dart';
@@ -537,9 +539,58 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                   const SizedBox(height: 28),
 
                   // ── NOTES & COMMENTAIRES ──────
-                  RecipeRatingsWidget(recipeId: widget.recipe.id),
+                  RecipeRatingsWidget(
+                    recipeId: widget.recipe.id,
+                    recipeTitle: widget.recipe.title,
+                  ),
 
                   const SizedBox(height: 28),
+
+                  // ── BOUTONS ACTIONS ──────────
+                  Row(children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => NutritionPage(recipe: widget.recipe))),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00BCD4).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFF00BCD4).withOpacity(0.3)),
+                          ),
+                          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Text('🥗', style: TextStyle(fontSize: 18)),
+                            SizedBox(width: 6),
+                            Text('Nutrition', style: TextStyle(
+                                color: Color(0xFF00BCD4), fontWeight: FontWeight.w800, fontSize: 14)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => const SubstitutePage())),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF26A69A).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFF26A69A).withOpacity(0.3)),
+                          ),
+                          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Text('🔄', style: TextStyle(fontSize: 18)),
+                            SizedBox(width: 6),
+                            Text('Substituer', style: TextStyle(
+                                color: Color(0xFF26A69A), fontWeight: FontWeight.w800, fontSize: 14)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
 
                   // ── BOUTON IA ─────────────────
                   GestureDetector(

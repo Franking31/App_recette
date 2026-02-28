@@ -18,10 +18,10 @@ class ShareService {
     }
   }
 
-  // Récupérer une recette partagée
+  // Récupérer une recette partagée (depuis app)
   static Future<Recipe?> getSharedRecipe(String token) async {
     try {
-      final data = await ApiService.get('/share/$token');
+      final data = await ApiService.get('/share/$token/json');
       return Recipe.fromJson(Map<String, dynamic>.from(data['recipe']));
     } catch (_) {
       return null;
