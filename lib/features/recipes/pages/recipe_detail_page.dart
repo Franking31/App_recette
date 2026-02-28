@@ -3,9 +3,15 @@ import '../../../core/constants/app_colors.dart';
 import '../data/models/recipe.dart';
 import '../../../core/services/favorites_service.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/api_service.dart';
 import '../../../core/services/shopping_service.dart';
 import 'ai_assistant_page.dart';
 import 'shopping_list_page.dart';
+import 'conversations_history_page.dart';
+import '../../../core/services/ratings_service.dart';
+import '../../../core/services/share_service.dart';
+import '../widgets/recipe_ratings_widget.dart';
+import 'package:flutter/services.dart';
 
 class RecipeDetailPage extends StatefulWidget {
   final Recipe recipe;
@@ -20,11 +26,16 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   final Set<int> _checkedIngredients = {};
   bool _isFavorite = false;
   bool _favLoading = false;
+  bool _sharingLink = false;
+  String? _liveImageUrl;
+  bool _loadingImage = false;
 
   @override
   void initState() {
     super.initState();
     _isFavorite = FavoritesService.isFavorite(widget.recipe.id);
+    _liveImageUrl = widget.recipe.imageUrl;
+    _liveImageUrl = widget.recipe.imageUrl;
   }
 
   @override
@@ -32,7 +43,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.background;
     final surface = isDark ? AppColors.darkSurface : AppColors.surface;
-    final surfaceAlt = isDark ? AppColors.darkSurfaceAlt : AppColors.surface;
+    // ignore: unused_local_variable
     final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
     final textLight = isDark ? AppColors.darkTextLight : AppColors.textLight;
     final catColor = AppColors.categoryColor(widget.recipe.category);
@@ -62,6 +73,24 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
               ),
             ),
             actions: [
+              // Bouton partage
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8, right: 4),
+                child: GestureDetector(
+                  onTap: _shareRecipe,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: _sharingLink
+                        ? const SizedBox(width: 18, height: 18,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.share_outlined, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: GestureDetector(
@@ -95,14 +124,57 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                 fit: StackFit.expand,
                 children: [
                   // Image ou placeholder
-                  widget.recipe.imageUrl != null
+                  _liveImageUrl != null
                       ? Image.network(
-                          widget.recipe.imageUrl!,
+                          _liveImageUrl!,
                           fit: BoxFit.cover,
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null ? child : _heroPlaceholder(catColor),
                           errorBuilder: (_, __, ___) =>
                               _heroPlaceholder(catColor),
                         )
-                      : _heroPlaceholder(catColor),
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _heroPlaceholder(catColor),
+                            if (AuthService.isLoggedIn)
+                              Positioned(
+                                bottom: 16,
+                                left: 0, right: 0,
+                                child: Center(
+                                  child: GestureDetector(
+                                    onTap: _refreshImage,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.6),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: _loadingImage
+                                          ? const SizedBox(
+                                              width: 16, height: 16,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2, color: Colors.white))
+                                          : const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.image_search,
+                                                    color: Colors.white, size: 16),
+                                                SizedBox(width: 6),
+                                                Text('Trouver une image',
+                                                    style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w700)),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                   // Gradient bas → transparent
                   Positioned(
                     bottom: 0,
@@ -226,7 +298,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.12),
+                                color: AppColors.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(children: [
@@ -244,7 +316,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.12),
+                                color: Colors.green.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(children: [
@@ -464,6 +536,11 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
 
                   const SizedBox(height: 28),
 
+                  // ── NOTES & COMMENTAIRES ──────
+                  RecipeRatingsWidget(recipeId: widget.recipe.id),
+
+                  const SizedBox(height: 28),
+
                   // ── BOUTON IA ─────────────────
                   GestureDetector(
                     onTap: () => Navigator.push(
@@ -519,6 +596,33 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   }
 
   // ── Ajouter ingrédients sélectionnés à une liste ──
+  // ── Rafraîchir l'image via Unsplash ────────
+  Future<void> _refreshImage() async {
+    if (_loadingImage) return;
+    setState(() => _loadingImage = true);
+    try {
+      final data = await ApiService.post(
+        '/ai/refresh-image/${widget.recipe.id}',
+        {'title': widget.recipe.title},
+      );
+      final url = data['imageUrl'] as String?;
+      if (mounted) {
+        setState(() {
+          _liveImageUrl = url;
+          _loadingImage = false;
+        });
+        if (url == null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: const Text('Pas d\'image trouvee. Verifiez la cle Unsplash sur Render.'),
+            backgroundColor: Colors.orange,
+          ));
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingImage = false);
+    }
+  }
+
   Future<void> _addIngredientsToList(BuildContext context) async {
     final recipe = widget.recipe;
     // Afficher dialog de sélection d'ingrédients
@@ -577,6 +681,70 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             MaterialPageRoute(builder: (_) => const ShoppingListPage())),
       ),
     ));
+  }
+
+  // ── Partager la recette ───────────────────
+  Future<void> _shareRecipe() async {
+    if (_sharingLink) return;
+    final isLoggedIn = AuthService.isLoggedIn;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ShareBottomSheet(
+        recipe: widget.recipe,
+        isLoggedIn: isLoggedIn,
+        onShareLink: () async {
+          Navigator.pop(ctx);
+          setState(() => _sharingLink = true);
+          final link = await ShareService.createShareLink(widget.recipe);
+          if (mounted) setState(() => _sharingLink = false);
+          if (link != null && mounted) {
+            await Clipboard.setData(ClipboardData(text: link));
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text('🔗 Lien copié dans le presse-papier !'),
+              backgroundColor: AppColors.primary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ));
+          }
+        },
+        onShareText: () {
+          Navigator.pop(ctx);
+          final text = _buildShareText(widget.recipe);
+          Clipboard.setData(ClipboardData(text: text));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text('📋 Recette copiée dans le presse-papier !'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ));
+        },
+      ),
+    );
+  }
+
+  String _buildShareText(Recipe r) {
+    final buf = StringBuffer();
+    buf.writeln('🍴 ${r.title}');
+    if (r.category != null) buf.writeln('${r.category}');
+    buf.writeln('⏱ ${r.durationMinutes} min · 👥 ${r.servings} pers.');
+    buf.writeln('');
+    buf.writeln('📝 ${r.description}');
+    buf.writeln('');
+    buf.writeln('🛒 Ingrédients :');
+    for (final ing in r.ingredients) {
+      buf.writeln('\u2022 $ing');
+    }
+    buf.writeln('');
+    buf.writeln('👨‍🍳 Préparation :');
+    for (var i = 0; i < r.steps.length; i++) {
+      buf.writeln('${i + 1}. ${r.steps[i]}');
+    }
+    buf.writeln('');
+    buf.writeln('— Partagé depuis ForkAI 🤖');
+    return buf.toString();
   }
 
   Future<void> _toggleFavorite() async {
@@ -706,7 +874,7 @@ class _IngredientPickerSheetState extends State<_IngredientPickerSheet> {
             margin: const EdgeInsets.only(top: 12, bottom: 8),
             width: 40, height: 4,
             decoration: BoxDecoration(
-              color: AppColors.textLight.withOpacity(0.3),
+              color: AppColors.textLight.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -794,7 +962,7 @@ class _ListPickerSheet extends StatelessWidget {
             margin: const EdgeInsets.only(top: 12, bottom: 8),
             width: 40, height: 4,
             decoration: BoxDecoration(
-              color: AppColors.textLight.withOpacity(0.3),
+              color: AppColors.textLight.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -814,7 +982,7 @@ class _ListPickerSheet extends StatelessWidget {
                   leading: Container(
                     width: 40, height: 40,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.12),
+                      color: AppColors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.add, color: AppColors.primary),
@@ -851,7 +1019,7 @@ class _ListPickerSheet extends StatelessWidget {
                   leading: Container(
                     width: 40, height: 40,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.shopping_cart_outlined, color: AppColors.primary, size: 20),
@@ -865,6 +1033,132 @@ class _ListPickerSheet extends StatelessWidget {
           ),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Sheet : Partage de recette
+// ─────────────────────────────────────────────
+class _ShareBottomSheet extends StatelessWidget {
+  final Recipe recipe;
+  final bool isLoggedIn;
+  final VoidCallback onShareLink;
+  final VoidCallback onShareText;
+
+  const _ShareBottomSheet({
+    required this.recipe,
+    required this.isLoggedIn,
+    required this.onShareLink,
+    required this.onShareText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
+    final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
+    final textLight = isDark ? AppColors.darkTextLight : AppColors.textLight;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: textLight.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Partager "${recipe.title}"',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textDark),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          _ShareOption(
+            icon: Icons.link_rounded,
+            color: AppColors.primary,
+            title: 'Copier le lien de partage',
+            subtitle: isLoggedIn ? 'Lien unique visible par tous' : 'Connexion requise',
+            enabled: isLoggedIn,
+            onTap: onShareLink,
+          ),
+          const SizedBox(height: 10),
+          _ShareOption(
+            icon: Icons.content_copy_rounded,
+            color: const Color(0xFF6C63FF),
+            title: 'Copier le texte complet',
+            subtitle: 'Ingredients + etapes prets a coller',
+            enabled: true,
+            onTap: onShareText,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShareOption extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ShareOption({
+    required this.icon, required this.color, required this.title,
+    required this.subtitle, required this.enabled, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkBackground : AppColors.background;
+    final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
+    final textLight = isDark ? AppColors.darkTextLight : AppColors.textLight;
+
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.4,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Row(children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700, color: textDark)),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: textLight)),
+              ],
+            )),
+            Icon(Icons.arrow_forward_ios, size: 13, color: textLight),
+          ]),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../features/recipes/pages/conversations_history_page.dart';
 import '../../../core/services/favorites_service.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/shopping_service.dart';
@@ -352,6 +353,19 @@ class _ProfilePageState extends State<ProfilePage> {
                                 },
                               );
                             },
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Historique IA
+                          _ActionTile(
+                            icon: Icons.history_rounded,
+                            label: 'Historique conversations IA',
+                            surface: surface,
+                            textDark: textDark,
+                            textLight: textLight,
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) => const ConversationsHistoryPage())),
                           ),
                           const SizedBox(height: 10),
 
