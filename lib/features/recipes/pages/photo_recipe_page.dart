@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
@@ -19,7 +19,8 @@ class PhotoRecipePage extends StatefulWidget {
 
 class _PhotoRecipePageState extends State<PhotoRecipePage>
     with TickerProviderStateMixin {
-  File? _image;
+  Uint8List? _imageBytes;
+  String _imageMimeType = 'image/jpeg';
   bool _analyzing = false;
   String _step = '';
   List<String> _detectedIngredients = [];
@@ -51,8 +52,12 @@ class _PhotoRecipePageState extends State<PhotoRecipePage>
     final picked = await picker.pickImage(
         source: source, maxWidth: 1200, maxHeight: 1200, imageQuality: 85);
     if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    final ext = picked.name.split('.').last.toLowerCase();
+    final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
     setState(() {
-      _image = File(picked.path);
+      _imageBytes = bytes;
+      _imageMimeType = mime;
       _recipes = [];
       _detectedIngredients = [];
       _error = null;
@@ -60,14 +65,14 @@ class _PhotoRecipePageState extends State<PhotoRecipePage>
   }
 
   Future<void> _analyze() async {
-    if (_image == null) return;
+    if (_imageBytes == null) return;
     setState(() { _analyzing = true; _error = null; _step = '🔍 Analyse de l\'image...'; });
 
     try {
       await Future.delayed(const Duration(milliseconds: 300));
       setState(() => _step = '🥦 Détection des ingrédients...');
 
-      final result = await VisionService.analyzePhoto(_image!, servings: _servings);
+      final result = await VisionService.analyzePhotoBytes(_imageBytes!, mimeType: _imageMimeType, servings: _servings);
 
       setState(() => _step = '👨‍🍳 Génération des recettes...');
       await Future.delayed(const Duration(milliseconds: 200));
@@ -144,18 +149,18 @@ class _PhotoRecipePageState extends State<PhotoRecipePage>
                         color: surface,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: _image != null
+                          color: _imageBytes != null
                               ? AppColors.primary.withValues(alpha: 0.4)
                               : textLight.withValues(alpha: 0.2),
                           width: 2,
                         ),
                         boxShadow: [BoxShadow(color: AppColors.cardShadow, blurRadius: 12)],
                       ),
-                      child: _image != null
+                      child: _imageBytes != null
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(18),
                               child: Stack(fit: StackFit.expand, children: [
-                                Image.file(_image!, fit: BoxFit.cover),
+                                Image.memory(_imageBytes!, fit: BoxFit.cover),
                                 // Bouton modifier en haut à droite
                                 Positioned(top: 10, right: 10,
                                   child: GestureDetector(
@@ -228,24 +233,24 @@ class _PhotoRecipePageState extends State<PhotoRecipePage>
                       // Bouton analyser
                       Expanded(
                         child: GestureDetector(
-                          onTap: (_image != null && !_analyzing) ? _analyze : null,
+                          onTap: (_imageBytes != null && !_analyzing) ? _analyze : null,
                           child: AnimatedBuilder(
                             animation: _pulse,
                             builder: (_, child) => Transform.scale(
-                              scale: (_image != null && !_analyzing) ? _pulse.value : 1.0,
+                              scale: (_imageBytes != null && !_analyzing) ? _pulse.value : 1.0,
                               child: child,
                             ),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               decoration: BoxDecoration(
-                                gradient: _image != null
+                                gradient: _imageBytes != null
                                     ? AppColors.primaryGradient
                                     : LinearGradient(colors: [
                                         textLight.withValues(alpha: 0.3),
                                         textLight.withValues(alpha: 0.2),
                                       ]),
                                 borderRadius: BorderRadius.circular(14),
-                                boxShadow: _image != null ? [BoxShadow(
+                                boxShadow: _imageBytes != null ? [BoxShadow(
                                     color: AppColors.primary.withValues(alpha: 0.3),
                                     blurRadius: 12, offset: const Offset(0, 4))] : [],
                               ),
@@ -253,7 +258,7 @@ class _PhotoRecipePageState extends State<PhotoRecipePage>
                                 const Text('🔍', style: TextStyle(fontSize: 18)),
                                 const SizedBox(width: 8),
                                 Text('Analyser & Cuisiner', style: TextStyle(
-                                    color: _image != null ? Colors.white : textLight,
+                                    color: _imageBytes != null ? Colors.white : textLight,
                                     fontWeight: FontWeight.w800, fontSize: 15)),
                               ]),
                             ),

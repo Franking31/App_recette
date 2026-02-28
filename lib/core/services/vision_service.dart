@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'api_service.dart';
 import '../../../features/recipes/data/models/recipe.dart';
 
@@ -163,13 +163,10 @@ class MealItem {
 
 // ── Service ───────────────────────────────────
 class VisionService {
-  // 📸 Photo → Recettes
+  // 📸 Photo → Recettes (depuis Uint8List - compatible Web & Mobile)
   static Future<({List<String> ingredients, List<Recipe> recipes, String message})>
-      analyzePhoto(File imageFile, {int servings = 4}) async {
-    final bytes = await imageFile.readAsBytes();
+      analyzePhotoBytes(Uint8List bytes, {String mimeType = 'image/jpeg', int servings = 4}) async {
     final base64Image = base64Encode(bytes);
-    final ext = imageFile.path.split('.').last.toLowerCase();
-    final mimeType = ext == 'png' ? 'image/png' : 'image/jpeg';
 
     final data = await ApiService.post('/vision/analyze', {
       'image': base64Image,
