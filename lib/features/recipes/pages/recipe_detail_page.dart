@@ -14,6 +14,7 @@ import '../../../core/services/ratings_service.dart';
 import '../../../core/services/share_service.dart';
 import '../widgets/recipe_ratings_widget.dart';
 import 'package:flutter/services.dart';
+import '../../../core/services/pdf_service.dart';
 
 class RecipeDetailPage extends StatefulWidget {
   final Recipe recipe;
@@ -75,6 +76,21 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
               ),
             ),
             actions: [
+              // Bouton PDF
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8, right: 4),
+                child: GestureDetector(
+                  onTap: _printPdf,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(Icons.print_outlined, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
               // Bouton partage
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 8, right: 4),
@@ -735,6 +751,10 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   }
 
   // ── Partager la recette ───────────────────
+  void _printPdf() {
+    PdfService.printRecipe(recipe: widget.recipe);
+  }
+
   Future<void> _shareRecipe() async {
     if (_sharingLink) return;
     final isLoggedIn = AuthService.isLoggedIn;
