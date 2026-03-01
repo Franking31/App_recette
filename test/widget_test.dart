@@ -5,7 +5,7 @@ import 'package:frank_recette/app.dart';
 void main() {
   group('Counter App Tests', () {
     testWidgets('Counter increments when tapping the button', (WidgetTester tester) async {
-      await tester.pumpWidget(const App());
+      await tester.pumpWidget(const App(showOnboarding: false));
 
       // Vérifiez que le compteur commence à 0
       expect(find.text('0'), findsOneWidget);
