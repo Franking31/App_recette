@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../../../features/recipes/data/models/recipe.dart';
 import 'api_service.dart';
+import 'cache_service.dart';
 
 // ═══════════════════════════════════════════
 //  FAVORITES SERVICE
@@ -12,15 +13,23 @@ class FavoritesService {
 
   // ── Charger les favoris ────────────────────
   static Future<List<Recipe>> getFavorites() async {
-    final data = await ApiService.get('/favorites');
-    final list = (data['favorites'] as List).map((f) {
-      final recipe = Recipe.fromJson(
-          Map<String, dynamic>.from(f['recipe_data']));
-      _favoriteIds.add(recipe.id);
-      return recipe;
-    }).toList();
-    _loaded = true;
-    return list;
+    if (!CacheService.isOnline) {
+      return CacheService.getCachedFavorites();
+    }
+    try {
+      final data = await ApiService.get('/favorites');
+      final list = (data['favorites'] as List).map((f) {
+        final recipe = Recipe.fromJson(
+            Map<String, dynamic>.from(f['recipe_data']));
+        _favoriteIds.add(recipe.id);
+        return recipe;
+      }).toList();
+      _loaded = true;
+      CacheService.cacheFavorites(list);
+      return list;
+    } catch (_) {
+      return CacheService.getCachedFavorites();
+    }
   }
 
   // ── Ajouter favori ─────────────────────────

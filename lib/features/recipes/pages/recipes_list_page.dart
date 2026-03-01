@@ -12,7 +12,8 @@ import '../pages/shopping_list_page.dart';
 import '../../../core/services/recipes_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/favorites_service.dart';
-
+import '../pages/search_page.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 class RecipesListPage extends StatefulWidget {
   const RecipesListPage({super.key});
@@ -193,6 +194,8 @@ class _RecipesListPageState extends State<RecipesListPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── BANNIÈRE HORS-LIGNE ────────────
+            const OfflineBanner(),
             // ── HEADER ────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -200,6 +203,23 @@ class _RecipesListPageState extends State<RecipesListPage>
                 children: [
                   AppLogo.full(dark: isDark),
                   const Spacer(),
+                  // Bouton recherche
+                  GestureDetector(
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const SearchPage())),
+                    child: Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: const [BoxShadow(
+                            color: AppColors.cardShadow, blurRadius: 6)],
+                      ),
+                      child: const Icon(Icons.search_rounded,
+                          color: AppColors.primary, size: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   // Bouton courses
                   GestureDetector(
                     onTap: () => Navigator.push(context,
