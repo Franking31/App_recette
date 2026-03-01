@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/app_localizations.dart';
 import '../../recipes/pages/recipes_list_page.dart';
 import 'signup_page.dart';
 
@@ -69,20 +70,20 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 48),
 
               // ── Titre ─────────────────────
-              Text('Bonjour 👋',
+              Text(AppLocalizations.t('auth_welcome') + ' 👋',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
                     color: textDark,
                   )),
               const SizedBox(height: 6),
-              Text('Connectez-vous pour accéder à vos recettes',
+              Text(AppLocalizations.t('auth_login'),
                   style: TextStyle(fontSize: 15, color: textLight)),
 
               const SizedBox(height: 36),
 
               // ── Email ─────────────────────
-              _label('Email', textLight),
+              _label(AppLocalizations.t('auth_email'), textLight),
               const SizedBox(height: 8),
               _field(
                 controller: _emailCtrl,
@@ -97,7 +98,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 16),
 
               // ── Mot de passe ──────────────
-              _label('Mot de passe', textLight),
+              _label(AppLocalizations.t('auth_password'), textLight),
               const SizedBox(height: 8),
               _field(
                 controller: _passCtrl,
@@ -167,7 +168,7 @@ class _LoginPageState extends State<LoginPage> {
                             width: 22, height: 22,
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2.5))
-                        : const Text('Se connecter',
+                        : Text(AppLocalizations.t('auth_login'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -188,7 +189,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: RichText(
                     text: TextSpan(
-                      text: 'Pas encore de compte ? ',
+                      text: AppLocalizations.t('auth_no_account') + ' ',
                       style: TextStyle(color: textLight, fontSize: 14),
                       children: [
                         TextSpan(

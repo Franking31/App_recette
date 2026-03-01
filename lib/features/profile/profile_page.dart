@@ -7,6 +7,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/shopping_service.dart';
 import '../../../app.dart';
 import '../../../core/widgets/recipe_card.dart';
+import '../../../core/services/app_localizations.dart';
 import '../auth/pages/login_page.dart';
 import '../recipes/pages/shopping_list_page.dart';
 
@@ -53,6 +54,90 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _showLanguagePicker(Color surface, Color textDark, Color textLight) {
+    final langs = [
+      (AppLanguage.fr, '🇫🇷', 'Français'),
+      (AppLanguage.en, '🇬🇧', 'English'),
+      (AppLanguage.es, '🇪🇸', 'Español'),
+    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkBackground : AppColors.background;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: textLight.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Langue / Language / Idioma',
+                style: TextStyle(fontSize: 16,
+                    fontWeight: FontWeight.w800, color: textDark)),
+            const SizedBox(height: 16),
+            ...langs.map((entry) {
+              final (lang, flag, label) = entry;
+              final isSelected = AppLocalizations.current == lang;
+              return GestureDetector(
+                onTap: () {
+                  AppLocalizations.setLanguage(lang);
+                  Navigator.pop(context);
+                  setState(() {}); // rebuild profil
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.primary.withOpacity(0.1)
+                        : surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.primary
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(flag, style: const TextStyle(fontSize: 24)),
+                      const SizedBox(width: 14),
+                      Text(label,
+                          style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? AppColors.primary : textDark,
+                          )),
+                      const Spacer(),
+                      if (isSelected)
+                        const Icon(Icons.check_circle_rounded,
+                            color: AppColors.primary, size: 22),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _logout() async {
@@ -215,14 +300,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           _StatCard(
                             emoji: '❤️',
                             value: '${_favorites.length}',
-                            label: 'Favoris',
+                            label: AppLocalizations.t('profile_favorites'),
                             isDark: isDark,
                           ),
                           const SizedBox(width: 12),
                           _StatCard(
                             emoji: '🤖',
                             value: '$_aiCount',
-                            label: 'Recettes IA',
+                            label: AppLocalizations.t('profile_ai_recipes'),
                             isDark: isDark,
                           ),
                           const SizedBox(width: 12),
@@ -342,7 +427,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 icon: isDarkMode
                                     ? Icons.light_mode_rounded
                                     : Icons.dark_mode_rounded,
-                                label: isDarkMode ? 'Mode clair' : 'Mode sombre',
+                                label: isDarkMode ? AppLocalizations.t('profile_light_mode') : AppLocalizations.t('profile_dark_mode'),
                                 surface: surface,
                                 textDark: textDark,
                                 textLight: textLight,
@@ -356,10 +441,25 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           const SizedBox(height: 10),
 
+                          // Sélecteur de langue
+                          ValueListenableBuilder<AppLanguage>(
+                            valueListenable: AppLocalizations.languageNotifier,
+                            builder: (_, lang, __) => _ActionTile(
+                              icon: Icons.language_rounded,
+                              label: AppLocalizations.languageLabel,
+                              surface: surface,
+                              textDark: textDark,
+                              textLight: textLight,
+                              onTap: () => _showLanguagePicker(
+                                  surface, textDark, textLight),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
                           // Historique IA
                           _ActionTile(
                             icon: Icons.history_rounded,
-                            label: 'Historique conversations IA',
+                            label: AppLocalizations.t('profile_history'),
                             surface: surface,
                             textDark: textDark,
                             textLight: textLight,
@@ -372,7 +472,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           // Déconnexion
                           _ActionTile(
                             icon: Icons.logout_rounded,
-                            label: 'Se déconnecter',
+                            label: AppLocalizations.t('profile_logout'),
                             surface: surface,
                             textDark: Colors.red,
                             textLight: Colors.red.withValues(alpha: 0.6),

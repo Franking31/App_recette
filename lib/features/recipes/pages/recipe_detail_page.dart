@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/app_localizations.dart';
+import '../../../core/services/user_prefs_service.dart';
 import '../data/models/recipe.dart';
 import '../../../core/services/favorites_service.dart';
 import '../../../core/services/auth_service.dart';
@@ -277,7 +279,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                     children: [
                       _infoChip(
                         Icons.schedule_rounded,
-                        '${widget.recipe.durationMinutes} min',
+                        '${widget.recipe.durationMinutes} ${AppLocalizations.t('recipes_duration')}',
                         catColor,
                         surface,
                         textDark,
@@ -285,7 +287,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                       const SizedBox(width: 10),
                       _infoChip(
                         Icons.people_rounded,
-                        '${widget.recipe.servings} pers.',
+                        '${widget.recipe.servings} ${AppLocalizations.t('recipes_servings')}',
                         catColor,
                         surface,
                         textDark,
@@ -307,7 +309,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _sectionTitle('🛒 Ingrédients', textDark),
+                      _sectionTitle(AppLocalizations.t('recipes_ingredients'), textDark),
                       Row(
                         children: [
                           // Ajouter sélection à une liste
@@ -481,7 +483,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                   const SizedBox(height: 28),
 
                   // ── ÉTAPES ────────────────────
-                  _sectionTitle('👨‍🍳 Préparation', textDark),
+                  _sectionTitle(AppLocalizations.t('recipes_steps'), textDark),
                   const SizedBox(height: 12),
                   ...widget.recipe.steps.asMap().entries.map((entry) {
                     final i = entry.key;
@@ -830,10 +832,12 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     try {
       final added = await FavoritesService.toggleFavorite(widget.recipe);
       setState(() => _isFavorite = added);
+      // Tracking IA silencieux
+      if (added) UserPrefsService.trackRecipeSaved(widget.recipe);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(added ? '❤️ Ajouté aux favoris !' : '💔 Retiré des favoris'),
+            content: Text(added ? '❤️ ${AppLocalizations.t('favorites_add')}' : '💔 ${AppLocalizations.t('favorites_remove')}'),
             duration: const Duration(seconds: 2),
           ),
         );

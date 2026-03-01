@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/app_localizations.dart';
 import '../../recipes/pages/recipes_list_page.dart';
 
 class SignupPage extends StatefulWidget {
@@ -94,17 +95,17 @@ class _SignupPageState extends State<SignupPage> {
               Center(child: AppLogo(size: 56, dark: isDark)),
               const SizedBox(height: 32),
 
-              Text('Créer un compte 🍴',
+              Text('${AppLocalizations.t('auth_signup')} 🍴',
                   style: TextStyle(
                     fontSize: 28, fontWeight: FontWeight.w900, color: textDark,
                   )),
               const SizedBox(height: 6),
-              Text('Rejoignez ForkAI et sauvegardez vos recettes',
+              Text(AppLocalizations.t('auth_create'),
                   style: TextStyle(fontSize: 14, color: textLight)),
 
               const SizedBox(height: 32),
 
-              _label('Email', textLight),
+              _label(AppLocalizations.t('auth_email'), textLight),
               const SizedBox(height: 8),
               _field(
                 controller: _emailCtrl,
@@ -116,7 +117,7 @@ class _SignupPageState extends State<SignupPage> {
 
               const SizedBox(height: 16),
 
-              _label('Mot de passe', textLight),
+              _label(AppLocalizations.t('auth_password'), textLight),
               const SizedBox(height: 8),
               _field(
                 controller: _passCtrl,
@@ -185,7 +186,7 @@ class _SignupPageState extends State<SignupPage> {
                         ? const SizedBox(width: 22, height: 22,
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2.5))
-                        : const Text('Créer mon compte',
+                        : Text(AppLocalizations.t('auth_signup'),
                             style: TextStyle(color: Colors.white,
                                 fontSize: 16, fontWeight: FontWeight.w800)),
                   ),
@@ -199,7 +200,7 @@ class _SignupPageState extends State<SignupPage> {
                   onTap: () => Navigator.pop(context),
                   child: RichText(
                     text: TextSpan(
-                      text: 'Déjà un compte ? ',
+                      text: AppLocalizations.t('auth_already_account') + ' ',
                       style: TextStyle(color: textLight, fontSize: 14),
                       children: [
                         TextSpan(

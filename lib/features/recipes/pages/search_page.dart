@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/widgets/recipe_card.dart';
+import '../pages/recipe_detail_page.dart';
 import '../../../core/services/recipes_service.dart';
+import '../../../core/services/app_localizations.dart';
 import '../data/models/recipe.dart';
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences/shared_preferences.dart';
@@ -221,7 +222,7 @@ class _SearchPageState extends State<SearchPage> {
                 onSubmitted: (v) => _search(),
                 style: TextStyle(fontSize: 15, color: AppColors.textDark),
                 decoration: InputDecoration(
-                  hintText: 'Titre, ingrédient...',
+                  hintText: AppLocalizations.t('search_hint'),
                   hintStyle: TextStyle(color: AppColors.textLight, fontSize: 14),
                   prefixIcon: const Icon(Icons.search_rounded,
                       color: AppColors.primary, size: 20),
@@ -341,7 +342,7 @@ class _SearchPageState extends State<SearchPage> {
           children: [
             const Text('🔍', style: TextStyle(fontSize: 48)),
             const SizedBox(height: 16),
-            Text('Recherchez par titre\nou par ingrédient',
+            Text(AppLocalizations.t('search_placeholder'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: textLight, fontSize: 15, height: 1.5)),
           ],
@@ -357,13 +358,13 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
             child: Row(
               children: [
-                Text('Recherches récentes',
+                Text(AppLocalizations.t('search_recent'),
                     style: TextStyle(color: textDark,
                         fontSize: 14, fontWeight: FontWeight.w800)),
                 const Spacer(),
                 GestureDetector(
                   onTap: _clearHistory,
-                  child: Text('Effacer',
+                  child: Text(AppLocalizations.t('search_clear'),
                       style: TextStyle(color: AppColors.primary,
                           fontSize: 12, fontWeight: FontWeight.w700)),
                 ),
@@ -392,7 +393,7 @@ class _SearchPageState extends State<SearchPage> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
             child: Text(
-              '${_results.length} résultat${_results.length > 1 ? 's' : ''}',
+              '${_results.length} ${_results.length > 1 ? AppLocalizations.t('search_results_plural') : AppLocalizations.t('search_results')}',
               style: TextStyle(color: textLight,
                   fontSize: 13, fontWeight: FontWeight.w600),
             ),
@@ -400,7 +401,7 @@ class _SearchPageState extends State<SearchPage> {
         ),
         SliverList(
           delegate: SliverChildBuilderDelegate(
-            (_, i) => RecipeCard(recipe: _results[i]),
+            (_, i) => _SearchRecipeCard(recipe: _results[i]),
             childCount: _results.length,
           ),
         ),
@@ -410,14 +411,14 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   // ── États vides/erreur/loading ─────────────
-  Widget _buildLoading() => const Center(
+  Widget _buildLoading() => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            SizedBox(height: 16),
-            Text('Recherche en cours...',
-                style: TextStyle(color: AppColors.textLight)),
+            const CircularProgressIndicator(color: AppColors.primary),
+            const SizedBox(height: 16),
+            Text(AppLocalizations.t('loading'),
+                style: const TextStyle(color: AppColors.textLight)),
           ],
         ),
       );
@@ -428,7 +429,7 @@ class _SearchPageState extends State<SearchPage> {
           children: [
             const Text('😕', style: TextStyle(fontSize: 48)),
             const SizedBox(height: 16),
-            Text('Aucune recette trouvée',
+            Text(AppLocalizations.t('recipes_empty'),
                 style: TextStyle(color: textLight,
                     fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
@@ -447,7 +448,7 @@ class _SearchPageState extends State<SearchPage> {
             children: [
               const Text('⚠️', style: TextStyle(fontSize: 40)),
               const SizedBox(height: 12),
-              const Text('Erreur de recherche',
+              Text(AppLocalizations.t('error'),
                   style: TextStyle(color: AppColors.textDark,
                       fontWeight: FontWeight.w700, fontSize: 16)),
               const SizedBox(height: 8),
@@ -463,10 +464,112 @@ class _SearchPageState extends State<SearchPage> {
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12))),
-                child: const Text('Réessayer'),
+                child: Text(AppLocalizations.t('retry')),
               ),
             ],
           ),
         ),
       );
+}
+
+// ── Carte recette format liste (hauteur auto) ─
+class _SearchRecipeCard extends StatelessWidget {
+  final Recipe recipe;
+  const _SearchRecipeCard({required this.recipe});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
+    final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
+    final textLight = isDark ? AppColors.darkTextLight : AppColors.textLight;
+    final catColor = AppColors.categoryColor(recipe.category);
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => RecipeDetailPage(recipe: recipe))),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(
+              color: AppColors.cardShadow, blurRadius: 10, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          children: [
+            // Image
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+              ),
+              child: SizedBox(
+                width: 100, height: 100,
+                child: recipe.imageUrl != null
+                    ? Image.network(recipe.imageUrl!, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _placeholder(catColor))
+                    : _placeholder(catColor),
+              ),
+            ),
+            // Contenu
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (recipe.category != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: catColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(recipe.category!,
+                            style: TextStyle(fontSize: 10,
+                                fontWeight: FontWeight.w700, color: catColor)),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(recipe.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14,
+                            fontWeight: FontWeight.w800, color: textDark)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.schedule_rounded, size: 12, color: catColor),
+                        const SizedBox(width: 3),
+                        Text('${recipe.durationMinutes} min',
+                            style: TextStyle(fontSize: 11,
+                                color: textLight, fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 10),
+                        Icon(Icons.people_rounded, size: 12, color: catColor),
+                        const SizedBox(width: 3),
+                        Text('${recipe.servings} pers.',
+                            style: TextStyle(fontSize: 11,
+                                color: textLight, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Icon(Icons.arrow_forward_ios_rounded,
+                  size: 12, color: textLight),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder(Color color) => Container(
+        color: color.withOpacity(0.12),
+        child: Center(child: Icon(Icons.restaurant_rounded,
+            color: color.withOpacity(0.6), size: 32)));
 }

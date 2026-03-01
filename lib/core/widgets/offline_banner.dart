@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/cache_service.dart';
+import '../../../core/services/app_localizations.dart';
 
 // ═══════════════════════════════════════════
 //  OFFLINE BANNER — Indicateur connexion
@@ -52,10 +53,10 @@ class _OfflineBar extends StatelessWidget {
         children: [
           const Icon(Icons.wifi_off_rounded, color: Colors.white70, size: 14),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Mode hors-ligne — données en cache',
-              style: TextStyle(color: Colors.white,
+              AppLocalizations.t('offline_banner'),
+              style: const TextStyle(color: Colors.white,
                   fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
@@ -80,16 +81,16 @@ class _SyncBar extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       color: AppColors.accentGreen.withOpacity(0.85),
-      child: const Row(
+      child: Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 12, height: 12,
             child: CircularProgressIndicator(
                 color: Colors.white, strokeWidth: 2),
           ),
-          SizedBox(width: 10),
-          Text('Synchronisation en cours...',
-              style: TextStyle(color: Colors.white,
+          const SizedBox(width: 10),
+          Text(AppLocalizations.t('syncing_banner'),
+              style: const TextStyle(color: Colors.white,
                   fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),

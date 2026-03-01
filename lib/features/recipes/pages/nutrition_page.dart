@@ -46,7 +46,10 @@ class _NutritionPageState extends State<NutritionPage> {
   Future<void> _analyze() async {
     final title = _titleCtrl.text.trim();
     final ingredientsText = _ingredientsCtrl.text.trim();
-    if (title.isEmpty || ingredientsText.isEmpty) return;
+    if (title.isEmpty || ingredientsText.isEmpty) {
+      setState(() => _error = 'Veuillez remplir le nom et les ingrédients.');
+      return;
+    }
 
     setState(() { _loading = true; _error = null; _data = null; });
     try {
@@ -54,9 +57,21 @@ class _NutritionPageState extends State<NutritionPage> {
           .map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
       final result = await VisionService.analyzeNutrition(
           title: title, ingredients: ingredients, servings: _servings);
-      if (mounted) setState(() { _data = result; _loading = false; });
+      if (mounted) {
+        if (result == null) {
+          setState(() {
+            _error = 'Erreur lors de l\'analyse. Vérifiez votre connexion et réessayez.';
+            _loading = false;
+          });
+        } else {
+          setState(() { _data = result; _loading = false; });
+        }
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _loading = false;
+      });
     }
   }
 
@@ -72,104 +87,207 @@ class _NutritionPageState extends State<NutritionPage> {
       backgroundColor: bg,
       body: SafeArea(
         child: Column(children: [
-          // ── HEADER ─────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          // ── HEADER gradient ─────────────────
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF00BCD4), Color(0xFF0097A7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [BoxShadow(color: Color(0x3300BCD4),
+                  blurRadius: 12, offset: Offset(0, 4))],
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 14, 20, 14),
             child: Row(children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: Container(width: 40, height: 40,
-                    decoration: BoxDecoration(color: surface,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [BoxShadow(color: AppColors.cardShadow, blurRadius: 6)]),
-                    child: Icon(Icons.arrow_back_ios_new, size: 18, color: textDark)),
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new, size: 16, color: Colors.white),
+                ),
               ),
-              const SizedBox(width: 14),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('🥗 Nutrition & Macros', style: TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w900, color: textDark)),
-                Text('Analyse complète de votre recette',
-                    style: TextStyle(fontSize: 12, color: textLight)),
-              ]),
+              const SizedBox(width: 12),
+              const Text('🥗', style: TextStyle(fontSize: 24)),
+              const SizedBox(width: 10),
+              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Nutrition & Macros',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+                Text('Analyse nutritionnelle complète',
+                    style: TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500)),
+              ])),
             ]),
           ),
 
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(20),
               child: Column(children: [
-                // ── FORMULAIRE ──────────────
-                if (widget.recipe == null) ...[
-                  _InputField(label: 'Nom de la recette', controller: _titleCtrl,
-                      hint: 'Ex: Lasagnes bolognaise', surface: surface,
-                      textDark: textDark, textLight: textLight),
-                  const SizedBox(height: 12),
-                  _InputField(label: 'Ingrédients (1 par ligne)', controller: _ingredientsCtrl,
-                      hint: '250g de farine\n3 œufs\n200ml de lait...', maxLines: 5,
-                      surface: surface, textDark: textDark, textLight: textLight),
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Text('Portions :', style: TextStyle(fontWeight: FontWeight.w700, color: textDark)),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => setState(() => _servings = (_servings - 1).clamp(1, 20)),
-                      child: Icon(Icons.remove_circle_outline, color: textLight)),
-                    const SizedBox(width: 12),
-                    Text('$_servings', style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w800, color: textDark)),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: () => setState(() => _servings = (_servings + 1).clamp(1, 20)),
-                      child: const Icon(Icons.add_circle_outline, color: AppColors.primary)),
-                  ]),
-                  const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: _analyze,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(14)),
-                      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Text('🥗', style: TextStyle(fontSize: 20)),
-                        SizedBox(width: 8),
-                        Text('Analyser', style: TextStyle(color: Colors.white,
-                            fontWeight: FontWeight.w800, fontSize: 16)),
-                      ]),
-                    ),
+
+                // ── FORMULAIRE ──────────────────
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: surface,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: AppColors.cardShadow,
+                        blurRadius: 10, offset: const Offset(0, 4))],
                   ),
-                  const SizedBox(height: 24),
-                ],
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00BCD4).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.edit_note_rounded,
+                            color: Color(0xFF00BCD4), size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Text('Recette à analyser', style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+                      if (widget.recipe != null) ...[
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _titleCtrl.clear();
+                            _ingredientsCtrl.clear();
+                          }),
+                          child: Text('Modifier', style: TextStyle(
+                              fontSize: 12, color: AppColors.textLight,
+                              decoration: TextDecoration.underline)),
+                        ),
+                      ],
+                    ]),
+                    const SizedBox(height: 16),
+
+                    _InputField(label: 'Nom de la recette', controller: _titleCtrl,
+                        hint: 'Ex: Lasagnes bolognaise', surface: bg,
+                        textDark: textDark, textLight: textLight),
+                    const SizedBox(height: 12),
+                    _InputField(label: 'Ingrédients (1 par ligne)',
+                        controller: _ingredientsCtrl,
+                        hint: '250g de farine\n3 œufs\n200ml de lait\n50g de beurre...',
+                        maxLines: 5, surface: bg,
+                        textDark: textDark, textLight: textLight),
+                    const SizedBox(height: 14),
+
+                    Row(children: [
+                      Text('Portions :', style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700, color: textDark)),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => setState(() => _servings = (_servings - 1).clamp(1, 20)),
+                        child: Container(
+                          width: 32, height: 32,
+                          decoration: BoxDecoration(color: bg,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Icon(Icons.remove, size: 16, color: textLight),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Text('$_servings', style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w900, color: textDark)),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _servings = (_servings + 1).clamp(1, 20)),
+                        child: Container(
+                          width: 32, height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00BCD4).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.add, size: 16, color: Color(0xFF00BCD4)),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 16),
+
+                    GestureDetector(
+                      onTap: _loading ? null : _analyze,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          gradient: _loading
+                              ? null
+                              : const LinearGradient(
+                                  colors: [Color(0xFF00BCD4), Color(0xFF0097A7)]),
+                          color: _loading ? AppColors.textLight : null,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: _loading ? [] : [
+                            BoxShadow(color: const Color(0xFF00BCD4).withOpacity(0.35),
+                                blurRadius: 10, offset: const Offset(0, 4)),
+                          ],
+                        ),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          if (_loading)
+                            const SizedBox(width: 18, height: 18,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                          else
+                            const Text('🔬', style: TextStyle(fontSize: 18)),
+                          const SizedBox(width: 8),
+                          Text(_loading ? 'Analyse en cours...' : 'Analyser la nutrition',
+                              style: const TextStyle(color: Colors.white,
+                                  fontWeight: FontWeight.w800, fontSize: 15)),
+                        ]),
+                      ),
+                    ),
+                  ]),
+                ),
 
                 // ── LOADING ─────────────────
-                if (_loading)
+                if (_loading) ...[
+                  const SizedBox(height: 24),
                   Container(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(color: surface,
+                        borderRadius: BorderRadius.circular(18)),
                     child: Column(children: [
-                      const CircularProgressIndicator(color: AppColors.primary),
-                      const SizedBox(height: 16),
-                      Text('Calcul nutritionnel en cours...',
-                          style: TextStyle(color: textLight, fontSize: 14)),
+                      const Text('🔬', style: TextStyle(fontSize: 52)),
+                      const SizedBox(height: 14),
+                      const CircularProgressIndicator(color: Color(0xFF00BCD4)),
+                      const SizedBox(height: 14),
+                      Text('Analyse nutritionnelle...', style: TextStyle(
+                          color: textDark, fontSize: 14, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text('L\'IA calcule calories, macros et vitamines',
+                          style: TextStyle(color: textLight, fontSize: 12)),
                     ]),
                   ),
+                ],
 
                 // ── ERREUR ──────────────────
-                if (_error != null)
+                if (_error != null) ...[
+                  const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(16)),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.red.withOpacity(0.2)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_error!.replaceAll('Exception: ', ''),
+                          style: const TextStyle(color: Colors.red, fontSize: 13))),
+                    ]),
                   ),
+                ],
 
                 // ── RÉSULTATS ────────────────
                 if (_data != null) ...[
-                  // Score global
+                  const SizedBox(height: 20),
                   _ScoreCard(data: _data!, isDark: isDark),
-                  const SizedBox(height: 16),
-
-                  // Toggle portion / total
+                  const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(color: surface,
@@ -181,80 +299,79 @@ class _NutritionPageState extends State<NutritionPage> {
                           onTap: () => setState(() => _perPortion = false)),
                     ]),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Macros
+                  const SizedBox(height: 14),
                   _MacrosGrid(
                     values: _perPortion ? _data!.perPortion : _data!.perRecipe,
                     isDark: isDark,
                   ),
-                  const SizedBox(height: 16),
-
-                  // Vitamines
+                  const SizedBox(height: 14),
                   if (_data!.vitamins.isNotEmpty) ...[
                     _SectionCard(
                       title: '💊 Vitamines & Minéraux',
                       isDark: isDark,
-                      child: Column(
-                        children: _data!.vitamins.map((v) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(children: [
-                            Expanded(child: Text(v.name, style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600, color: textDark))),
-                            Text(v.amount, style: TextStyle(
-                                fontSize: 13, color: textLight)),
-                            const SizedBox(width: 10),
-                            Container(
-                              width: 90,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: _parsePercent(v.daily),
-                                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                                  color: AppColors.primary,
-                                  minHeight: 6,
-                                ),
-                              ),
+                      child: Column(children: _data!.vitamins.map((v) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(children: [
+                          Expanded(child: Text(v.name, style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600, color: textDark))),
+                          Text(v.amount, style: TextStyle(fontSize: 13, color: textLight)),
+                          const SizedBox(width: 10),
+                          SizedBox(width: 90,
+                            child: ClipRRect(borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: _parsePercent(v.daily),
+                                backgroundColor: const Color(0xFF00BCD4).withOpacity(0.1),
+                                color: const Color(0xFF00BCD4), minHeight: 6),
                             ),
-                            const SizedBox(width: 6),
-                            Text(v.daily, style: TextStyle(
-                                fontSize: 11, color: textLight)),
-                          ]),
-                        )).toList(),
-                      ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(v.daily, style: TextStyle(fontSize: 11, color: textLight)),
+                        ]),
+                      )).toList()),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                   ],
-
-                  // Compatibilité régimes
                   _DietCompatibility(data: _data!, isDark: isDark),
-                  const SizedBox(height: 16),
-
-                  // Points forts / améliorations
+                  const SizedBox(height: 14),
                   _StrengthsImprovements(data: _data!, isDark: isDark),
-                  const SizedBox(height: 16),
-
-                  // Conseil
+                  const SizedBox(height: 14),
                   if (_data!.tip.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [
-                          AppColors.primary.withOpacity(0.1),
-                          AppColors.accent.withOpacity(0.1),
-                        ]),
+                        color: const Color(0xFF00BCD4).withOpacity(0.06),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                        border: Border.all(color: const Color(0xFF00BCD4).withOpacity(0.2)),
                       ),
                       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('💡', style: TextStyle(fontSize: 20)),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(_data!.tip, style: TextStyle(
-                            fontSize: 13, color: textDark, height: 1.5))),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00BCD4).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Text('💡', style: TextStyle(fontSize: 16)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Conseil nutritionnel', style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w800,
+                                color: Color(0xFF00838F))),
+                            const SizedBox(height: 4),
+                            Text(_data!.tip, style: TextStyle(
+                                fontSize: 13, color: textDark, height: 1.5)),
+                          ],
+                        )),
                       ]),
                     ),
-
                   const SizedBox(height: 30),
+                ],
+
+                // ── ÉTAT VIDE ────────────────
+                if (!_loading && _data == null && _error == null) ...[
+                  const SizedBox(height: 20),
+                  _EmptyState(textLight: textLight),
                 ],
               ]),
             ),
@@ -533,4 +650,36 @@ class _ToggleBtn extends StatelessWidget {
       ),
     ),
   );
+}
+
+
+class _EmptyState extends StatelessWidget {
+  final Color textLight;
+  const _EmptyState({required this.textLight});
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    const Text('🔬', style: TextStyle(fontSize: 64)),
+    const SizedBox(height: 16),
+    Text('Analysez n\'importe quelle recette',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textLight)),
+    const SizedBox(height: 8),
+    Text('Entrez les ingrédients et laissez l\'IA calculer calories, macros, vitamines et plus encore !',
+        style: TextStyle(fontSize: 13, color: textLight.withOpacity(0.7), height: 1.5),
+        textAlign: TextAlign.center),
+    const SizedBox(height: 20),
+    Wrap(spacing: 10, runSpacing: 10, alignment: WrapAlignment.center,
+      children: ['🔥 Calories', '💪 Protéines', '🌾 Glucides', '🥑 Lipides',
+                  '💊 Vitamines', '🍽️ Régimes'].map((t) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF00BCD4).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF00BCD4).withOpacity(0.2)),
+        ),
+        child: Text(t, style: const TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF00BCD4))),
+      )).toList(),
+    ),
+  ]);
 }

@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/app_localizations.dart';
 import '../auth/pages/login_page.dart';
 import '../auth/pages/signup_page.dart';
-
 
 // ═══════════════════════════════════════════
 //  ONBOARDING — ForkAI
@@ -138,7 +138,7 @@ class _OnboardingPageState extends State<OnboardingPage>
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text('Passer',
+                  child: Text(AppLocalizations.t('skip'),
                       style: TextStyle(color: Colors.white,
                           fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
@@ -579,7 +579,7 @@ class _OnboardingPageState extends State<OnboardingPage>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Continuer',
+            Text(AppLocalizations.t('next'),
                 style: TextStyle(
                     color: _pageColors[_currentPage],
                     fontWeight: FontWeight.w800, fontSize: 16)),
@@ -610,9 +610,9 @@ class _OnboardingPageState extends State<OnboardingPage>
                 ),
               ],
             ),
-            child: const Center(
-              child: Text('Créer un compte gratuit',
-                  style: TextStyle(color: Color(0xFF2D5A27),
+            child: Center(
+              child: Text(AppLocalizations.t('onboarding_create_account'),
+                  style: const TextStyle(color: Color(0xFF2D5A27),
                       fontWeight: FontWeight.w800, fontSize: 16)),
             ),
           ),
@@ -628,9 +628,9 @@ class _OnboardingPageState extends State<OnboardingPage>
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.white.withOpacity(0.3)),
             ),
-            child: const Center(
-              child: Text('J\'ai déjà un compte',
-                  style: TextStyle(color: Colors.white,
+            child: Center(
+              child: Text(AppLocalizations.t('onboarding_already'),
+                  style: const TextStyle(color: Colors.white,
                       fontWeight: FontWeight.w600, fontSize: 15)),
             ),
           ),
