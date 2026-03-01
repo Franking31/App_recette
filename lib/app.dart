@@ -3,11 +3,13 @@ import 'core/theme/app_theme.dart';
 import 'core/services/auth_service.dart';
 import 'features/recipes/pages/recipes_list_page.dart';
 import 'features/auth/pages/login_page.dart';
+import 'features/onboarding/onboarding_page.dart';
 
 final themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
 
 class App extends StatelessWidget {
-  const App({super.key});
+  final bool showOnboarding;
+  const App({super.key, required this.showOnboarding});
 
   @override
   Widget build(BuildContext context) {
@@ -20,10 +22,11 @@ class App extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: mode,
-          // Redirection selon l'état de connexion
-          home: AuthService.isLoggedIn
-              ? const RecipesListPage()
-              : const LoginPage(),
+          home: showOnboarding
+              ? const OnboardingPage()
+              : AuthService.isLoggedIn
+                  ? const RecipesListPage()
+                  : const LoginPage(),
         );
       },
     );
