@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/app_localizations.dart';
 import '../../../core/widgets/recipe_card.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../app.dart';
@@ -307,7 +308,7 @@ class _RecipesListPageState extends State<RecipesListPage>
               child: Row(
                 children: [
                   Text(
-                    '${_recipes.length} recettes disponibles',
+                    '${_recipes.length} ${AppLocalizations.t('recipes_count')}',
                     style: TextStyle(
                       fontSize: 13,
                       color: textLight,
@@ -348,7 +349,7 @@ class _RecipesListPageState extends State<RecipesListPage>
                 child: TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
                   decoration: InputDecoration(
-                    hintText: 'Rechercher une recette...',
+                    hintText: AppLocalizations.t('recipes_search_hint'),
                     hintStyle: TextStyle(color: textLight, fontSize: 14),
                     prefixIcon: const Icon(Icons.search_rounded,
                         color: AppColors.primary, size: 22),
@@ -442,13 +443,13 @@ class _RecipesListPageState extends State<RecipesListPage>
                             ),
                           ),
                           const SizedBox(height: 16),
-                          Text('Aucune recette trouvée',
+                          Text(AppLocalizations.t('recipes_empty'),
                               style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
                                   color: textLight)),
                           const SizedBox(height: 6),
-                          Text('Essayez un autre mot-clé',
+                          Text('Essayez un autre mot-clé ou filtre',
                               style: TextStyle(
                                   fontSize: 13, color: textLight)),
                         ],

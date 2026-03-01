@@ -191,16 +191,15 @@ class VisionService {
     required List<String> ingredients,
     required int servings,
   }) async {
-    try {
-      final data = await ApiService.post('/vision/nutrition', {
-        'title': title,
-        'ingredients': ingredients,
-        'servings': servings,
-      });
-      return NutritionData.fromJson(Map<String, dynamic>.from(data['nutrition']));
-    } catch (_) {
-      return null;
+    final data = await ApiService.post('/vision/nutrition', {
+      'title': title,
+      'ingredients': ingredients,
+      'servings': servings,
+    });
+    if (data['nutrition'] == null) {
+      throw Exception('Réponse invalide du serveur.');
     }
+    return NutritionData.fromJson(Map<String, dynamic>.from(data['nutrition']));
   }
 
   // 🔄 Substitution d'ingrédient
