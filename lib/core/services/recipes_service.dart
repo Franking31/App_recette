@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../../features/recipes/data/models/recipe.dart';
 import 'api_service.dart';
 import 'cache_service.dart';
@@ -7,6 +8,9 @@ import 'cache_service.dart';
 // ═══════════════════════════════════════════
 
 class RecipesService {
+  // Verrou pour éviter les appels simultanés au démarrage
+  static bool _isLoading = false;
+
   static Recipe _mapRow(dynamic r) => Recipe.fromJson({
         'id': r['id'],
         'title': r['title'],
@@ -52,8 +56,10 @@ class RecipesService {
   }
 
   // ── Catégories disponibles ─────────────────
+  // Petit délai pour éviter les appels simultanés avec getMyRecipes
   static Future<List<String>> getCategories() async {
     try {
+      await Future.delayed(const Duration(milliseconds: 500));
       final data = await ApiService.get('/recipes/categories');
       return List<String>.from(data['categories'] ?? []);
     } catch (_) {
@@ -67,17 +73,23 @@ class RecipesService {
     if (!CacheService.isOnline) {
       return CacheService.getCachedRecipes();
     }
+    // Anti-doublon : si déjà en cours, on attend et on retourne le cache
+    if (_isLoading) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      return CacheService.getCachedRecipes();
+    }
+    _isLoading = true;
     try {
       final data = await ApiService.get('/recipes');
       final recipes = (data['recipes'] as List)
           .map((r) => _mapRow(r))
           .toList();
-      // Met à jour le cache
       CacheService.cacheRecipes(recipes);
       return recipes;
     } catch (_) {
-      // Erreur réseau → fallback cache
       return CacheService.getCachedRecipes();
+    } finally {
+      _isLoading = false;
     }
   }
 

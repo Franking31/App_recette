@@ -693,34 +693,57 @@ class _RecipesListPageState extends State<RecipesListPage>
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
               child: Row(children: [
-                Text('\${_filtered.length} recette\${_filtered.length > 1 ? "s" : ""}',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                        color: textLight)),
-                if (_activeFilterCount > 0) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _clearFilters,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                // ── Partie gauche : compteur + reset ──
+                Expanded(
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Flexible(
+                      child: Text(
+                        '${_filtered.length} recette${_filtered.length > 1 ? "s" : ""}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: textLight),
                       ),
-                      child: const Text('✕ Réinitialiser',
-                          style: TextStyle(fontSize: 10, color: AppColors.primary,
-                              fontWeight: FontWeight.w700)),
                     ),
-                  ),
-                ],
-                const Spacer(),
+                    if (_activeFilterCount > 0) ...[
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: _clearFilters,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text('✕ Réinitialiser',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ]),
+                ),
+                // ── Partie droite : tri ──
                 GestureDetector(
                   onTap: () => _showSortSheet(context, surface),
-                  child: Row(children: [
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.swap_vert_rounded, size: 14, color: textLight),
                     const SizedBox(width: 4),
-                    Text(_sortLabel, style: TextStyle(
-                        fontSize: 12, color: textLight,
-                        fontWeight: FontWeight.w600)),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: Text(
+                        _sortLabel,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: textLight,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ]),
                 ),
               ]),
