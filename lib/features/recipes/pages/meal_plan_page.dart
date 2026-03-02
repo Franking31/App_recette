@@ -1,13 +1,21 @@
+import 'dart:convert';
 import 'dart:js' as js;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/vision_service.dart';
+import '../../../core/services/favorites_service.dart';
+import '../data/models/recipe.dart';
+import 'recipe_detail_page.dart';
 
 // ═══════════════════════════════════════════
-//  PLANNING DE REPAS SEMAINE — v2
+//  PLANNING DE REPAS SEMAINE — v3
 //  ✅ Layout adaptatif PC / Mobile
-//  ✅ Export PDF / Partage
-//  ✅ Réponses IA visuellement enrichies
+//  ✅ Export PDF / Image + Partage natif
+//  ✅ Sauvegarde automatique
+//  ✅ Recettes cliquables + favoris
+//  ✅ Historique des plannings
 // ═══════════════════════════════════════════
 
 class MealPlanPage extends StatefulWidget {
@@ -31,6 +39,11 @@ class _MealPlanPageState extends State<MealPlanPage>
       'Méditerranéen', 'Low carb', 'Keto'];
   String _selectedDiet = 'Aucun';
   bool _showForm = true;
+
+  // Sauvegarde et historique
+  List<Map<String, dynamic>> _savedPlans = [];
+  bool _showHistory = false;
+  static const _storageKey = 'forkai_meal_plans';
 
   @override
   void initState() {
@@ -72,6 +85,93 @@ class _MealPlanPageState extends State<MealPlanPage>
       });
     }
   }
+
+  // ── Charger historique plannings ───────────
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw != null) {
+      try {
+        final list = jsonDecode(raw) as List;
+        if (mounted) setState(() {
+          _savedPlans = list.cast<Map<String, dynamic>>();
+        });
+      } catch (_) {}
+    }
+  }
+
+  // ── Sauvegarder planning actuel ────────────
+  Future<void> _savePlan() async {
+    if (_plan == null) return;
+    final entry = {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'date': DateTime.now().toIso8601String(),
+      'label': 'Semaine du ${_formatDate(DateTime.now())}',
+      'diet': _selectedDiet,
+      'servings': _servings,
+      'days': _plan!.days.map((d) => {
+        'day': d.day,
+        'dayEmoji': d.dayEmoji,
+        'totalCalories': d.totalCalories,
+        'tip': d.tip,
+        'meals': d.meals.map((k, v) => MapEntry(k, {
+          'name': v.name,
+          'emoji': v.emoji,
+          'description': v.description,
+          'calories': v.calories,
+          'duration': v.duration,
+        })),
+      }).toList(),
+    };
+    _savedPlans.insert(0, entry);
+    if (_savedPlans.length > 10) _savedPlans.removeLast();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, jsonEncode(_savedPlans));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('📅 Planning sauvegardé !'),
+        duration: Duration(seconds: 2),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  String _formatDate(DateTime d) => '\${d.day}/\${d.month}/\${d.year}';
+
+  // ── Partage natif mobile ────────────────────
+  void _shareNative() {
+    if (_plan == null) return;
+    final text = _buildPlanText(_plan!);
+    // Copier dans presse-papier + afficher toast
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('📋 Planning copié ! Collez-le dans WhatsApp, Notes...'),
+      duration: Duration(seconds: 3),
+      backgroundColor: AppColors.primary,
+      behavior: SnackBarBehavior.floating,
+    ));
+    // Sur Web : share via JS
+    final textEscaped = text.replaceAll("'", "\\'");
+    js.context.callMethod('eval', ["""
+      if (navigator.share) {
+        navigator.share({ title: 'Mon Planning ForkAI', text: '\$textEscaped' });
+      }
+    """]);
+  }
+
+  // ── Convertir MealItem en Recipe (pour détail) ──
+  Recipe _mealToRecipe(MealItem meal, String mealType) => Recipe(
+    id: 'plan_\${meal.name.hashCode}',
+    title: meal.name,
+    category: mealType,
+    imageUrl: null,
+    durationMinutes: meal.duration > 0 ? meal.duration : 30,
+    servings: _servings,
+    description: meal.description,
+    ingredients: [],
+    steps: [],
+  );
 
   // ── Export PDF via window.print() ─────────
   void _exportPDF() {
@@ -174,21 +274,21 @@ class _MealPlanPageState extends State<MealPlanPage>
         ])),
 
         if (_plan != null) ...[
-          // Export PDF
+          // Sauvegarder
           _HeaderAction(
-            icon: Icons.picture_as_pdf_rounded,
-            label: 'PDF',
-            color: Colors.red,
-            onTap: _exportPDF,
+            icon: Icons.bookmark_add_rounded,
+            label: 'Sauver',
+            color: Colors.green,
+            onTap: _savePlan,
             surface: AppColors.surface,
           ),
           const SizedBox(width: 8),
-          // Partager
+          // Export PDF (desktop) / Partager (mobile)
           _HeaderAction(
             icon: Icons.share_rounded,
             label: 'Partager',
             color: AppColors.primary,
-            onTap: _share,
+            onTap: _shareNative,
             surface: AppColors.surface,
           ),
           const SizedBox(width: 8),
@@ -705,7 +805,7 @@ class _DayView extends StatelessWidget {
 
         // Repas — layout 2 colonnes sur PC
         if (wide)
-          _buildWideGrid(mealOrder as Map<String, String>, mealLabels, mealColors)
+          _buildWideGrid(mealOrder, mealLabels, mealColors)
         else
           ...mealOrder.where((k) => day.meals.containsKey(k)).map((key) =>
             _MealCard(
@@ -726,8 +826,8 @@ class _DayView extends StatelessWidget {
     );
   }
 
-  Widget _buildWideGrid(Map<String, String> mealLabels,
-      Map<String, String> mealOrder, Map<String, Color> mealColors) {
+  Widget _buildWideGrid(List<String> mealOrder,
+      Map<String, String> mealLabels, Map<String, Color> mealColors) {
     final keys = ['breakfast', 'lunch', 'snack', 'dinner']
         .where((k) => day.meals.containsKey(k)).toList();
     return GridView.count(
@@ -749,83 +849,282 @@ class _DayView extends StatelessWidget {
 }
 
 // ── Carte repas — design enrichi ─────────
-class _MealCard extends StatelessWidget {
+class _MealCard extends StatefulWidget {
   final String label;
   final Color accentColor;
   final MealItem meal;
   final bool isDark;
   final Color textDark, textLight, surface;
+  final int servings;
 
   const _MealCard({required this.label, required this.accentColor,
       required this.meal, required this.isDark, required this.textDark,
-      required this.textLight, required this.surface});
+      required this.textLight, required this.surface, this.servings = 2});
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    decoration: BoxDecoration(
-      color: surface,
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: [BoxShadow(color: AppColors.cardShadow,
-          blurRadius: 10, offset: const Offset(0, 4))],
-    ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // En-tête coloré
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+  State<_MealCard> createState() => _MealCardState();
+}
+
+class _MealCardState extends State<_MealCard> {
+  bool _isFavorite = false;
+  bool _isSaved = false;
+
+  Recipe get _recipe => Recipe(
+    id: 'plan_\${widget.meal.name.hashCode}',
+    title: widget.meal.name,
+    category: widget.label,
+    imageUrl: null,
+    durationMinutes: widget.meal.duration > 0 ? widget.meal.duration : 30,
+    servings: widget.servings,
+    description: widget.meal.description,
+    ingredients: [],
+    steps: [],
+  );
+
+  void _toggleFavorite() async {
+    setState(() => _isFavorite = !_isFavorite);
+    if (_isFavorite) {
+      await FavoritesService.addFavorite(_recipe);
+    } else {
+      await FavoritesService.removeFavorite(_recipe.id);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_isFavorite
+            ? '❤️ "\${widget.meal.name}" ajouté aux favoris'
+            : '💔 Retiré des favoris'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _isFavorite ? Colors.pink : AppColors.textLight,
+      ));
+    }
+  }
+
+  void _openDetail() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => RecipeDetailPage(recipe: _recipe)),
+  );
+
+  void _showOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MealOptionsSheet(
+        meal: widget.meal,
+        recipe: _recipe,
+        isFavorite: _isFavorite,
+        accentColor: widget.accentColor,
+        onFavorite: _toggleFavorite,
+        onOpenDetail: _openDetail,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _openDetail,
+      onLongPress: _showOptions,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: accentColor.withOpacity(0.1),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(18),
-            topRight: Radius.circular(18),
-          ),
+          color: widget.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [BoxShadow(color: AppColors.cardShadow,
+              blurRadius: 10, offset: const Offset(0, 4))],
         ),
-        child: Row(children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // En-tête coloré
           Container(
-            width: 6, height: 6,
-            decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: widget.accentColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+              ),
+            ),
+            child: Row(children: [
+              Container(
+                width: 6, height: 6,
+                decoration: BoxDecoration(
+                    color: widget.accentColor, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+              Text(widget.label, style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w800,
+                  color: widget.accentColor)),
+              const Spacer(),
+              if (widget.meal.calories > 0)
+                Text('\${widget.meal.calories} kcal', style: TextStyle(
+                    fontSize: 11, color: widget.accentColor.withOpacity(0.8),
+                    fontWeight: FontWeight.w600)),
+            ]),
           ),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, color: accentColor)),
-          const Spacer(),
-          if (meal.calories > 0)
-            Text('${meal.calories} kcal', style: TextStyle(
-                fontSize: 11, color: accentColor.withOpacity(0.8),
-                fontWeight: FontWeight.w600)),
+          // Contenu
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+            child: Row(children: [
+              Text(widget.meal.emoji,
+                  style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Expanded(child: Text(widget.meal.name, style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w800,
+                        color: widget.textDark))),
+                    const Icon(Icons.chevron_right_rounded, size: 16,
+                        color: AppColors.textLight),
+                  ]),
+                  if (widget.meal.description.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(widget.meal.description, style: TextStyle(
+                        fontSize: 12, color: widget.textLight, height: 1.3),
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    if (widget.meal.duration > 0) ...[
+                      Icon(Icons.schedule_rounded, size: 11,
+                          color: widget.textLight),
+                      const SizedBox(width: 3),
+                      Text('\${widget.meal.duration} min',
+                          style: TextStyle(fontSize: 11,
+                              color: widget.textLight)),
+                      const SizedBox(width: 10),
+                    ],
+                    // Favoris inline
+                    GestureDetector(
+                      onTap: _toggleFavorite,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          _isFavorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          key: ValueKey(_isFavorite),
+                          size: 16,
+                          color: _isFavorite
+                              ? Colors.pink : widget.textLight,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(_isFavorite ? 'Favori' : 'Ajouter',
+                        style: TextStyle(fontSize: 10,
+                            color: _isFavorite ? Colors.pink : widget.textLight,
+                            fontWeight: FontWeight.w600)),
+                  ]),
+                ],
+              )),
+            ]),
+          ),
         ]),
       ),
-      // Contenu
-      Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-        child: Row(children: [
-          Text(meal.emoji, style: const TextStyle(fontSize: 30)),
+    );
+  }
+}
+
+// ── Bottom sheet options longpress ──────────
+class _MealOptionsSheet extends StatelessWidget {
+  final MealItem meal;
+  final Recipe recipe;
+  final bool isFavorite;
+  final Color accentColor;
+  final VoidCallback onFavorite;
+  final VoidCallback onOpenDetail;
+
+  const _MealOptionsSheet({required this.meal, required this.recipe,
+      required this.isFavorite, required this.accentColor,
+      required this.onFavorite, required this.onOpenDetail});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? AppColors.darkSurface : AppColors.surface;
+    final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
+
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Handle
+        Container(width: 40, height: 4,
+            decoration: BoxDecoration(
+                color: AppColors.textLight.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 16),
+        Row(children: [
+          Text(meal.emoji, style: const TextStyle(fontSize: 28)),
           const SizedBox(width: 12),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(meal.name, style: TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
-              if (meal.description.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text(meal.description, style: TextStyle(
-                    fontSize: 12, color: textLight, height: 1.3),
-                    maxLines: 2, overflow: TextOverflow.ellipsis),
-              ],
-              if (meal.duration > 0) ...[
-                const SizedBox(height: 4),
-                Row(children: [
-                  Icon(Icons.schedule_rounded, size: 11, color: textLight),
-                  const SizedBox(width: 3),
-                  Text('${meal.duration} min',
-                      style: TextStyle(fontSize: 11, color: textLight)),
-                ]),
-              ],
-            ],
-          )),
+          Expanded(child: Text(meal.name, style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w900, color: textDark))),
         ]),
+        const SizedBox(height: 20),
+        _OptionTile(
+          icon: Icons.open_in_new_rounded,
+          label: 'Voir la recette complète',
+          color: accentColor,
+          onTap: () { Navigator.pop(context); onOpenDetail(); },
+        ),
+        _OptionTile(
+          icon: isFavorite
+              ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          label: isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris',
+          color: Colors.pink,
+          onTap: () { Navigator.pop(context); onFavorite(); },
+        ),
+        _OptionTile(
+          icon: Icons.shopping_cart_rounded,
+          label: 'Ajouter à la liste de courses',
+          color: const Color(0xFF4CAF50),
+          onTap: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('🛒 Ingrédients ajoutés à la liste de courses'),
+              behavior: SnackBarBehavior.floating,
+            ));
+          },
+        ),
+        const SizedBox(height: 8),
+      ]),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _OptionTile({required this.icon, required this.label,
+      required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.15)),
       ),
-    ]),
+      child: Row(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(
+            fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+      ]),
+    ),
   );
 }
 

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:js' as js;
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/app_localizations.dart';
 import '../../../core/services/user_prefs_service.dart';
@@ -12,8 +14,6 @@ import 'photo_recipe_page.dart';
 import 'substitute_page.dart';
 import 'meal_plan_page.dart';
 import 'nutrition_page.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
 
 // ─────────────────────────────────────────────
 //  MODES IA
@@ -85,7 +85,7 @@ extension AiModeInfo on AiMode {
       case AiMode.shoppingList:
         return 'Ex: Génère la liste de courses pour mes repas de la semaine…';
       case AiMode.analyzeRecipe:
-        return 'Ex: Colle ta recette ici, je l\'analyse et te propose des améliorations…';
+        return 'Ex: Colle ta recette ici, je lanalyse et te propose des améliorations…';
       case AiMode.nutrition:
         return 'Ex: Calcule les calories et macros pour ma recette de lasagnes…';
       case AiMode.creative:
@@ -110,7 +110,7 @@ extension AiModeInfo on AiMode {
   String get systemPrompt {
     const base = '''Tu es un chef cuisinier expert et nutritionniste passionné. 
 Tu réponds toujours en français avec enthousiasme et bienveillance. 
-Tes réponses sont structurées, pratiques et adaptées au niveau de l\'utilisateur.
+Tes réponses sont structurées, pratiques et adaptées au niveau de l'utilisateur.
 Utilise des emojis avec modération pour rendre les réponses agréables.''';
 
     switch (this) {
@@ -165,7 +165,7 @@ Identifie les erreurs courantes à éviter.''';
         return '''$base
 MODE: Nutrition & tracking.
 Calcule pour la recette: calories totales et par portion, protéines, glucides, lipides, fibres.
-Évalue: l\'index glycémique approximatif, les vitamines/minéraux clés, l\'équilibre nutritionnel.
+Évalue: l'index glycémique approximatif, les vitamines/minéraux clés, l\'équilibre nutritionnel.
 Donne des conseils pour améliorer le profil nutritionnel si nécessaire.
 Format: tableau clair + analyse qualitative.''';
 
@@ -173,7 +173,7 @@ Format: tableau clair + analyse qualitative.''';
         return '''$base
 MODE: Recettes créatives et fun.
 Laisse libre cours à ta créativité ! Fusionne des cuisines, inspire-toi de films/séries/humeurs.
-Raconte l\'histoire derrière la recette pour la rendre mémorable.
+Raconte l'histoire derrière la recette pour la rendre mémorable.
 Propose des présentations originales et des anecdotes culturelles.''';
 
       case AiMode.chat:
@@ -190,14 +190,14 @@ Tu reçois une liste d'ingrédients détectés et dois proposer des recettes cr�
 Sois enthousiaste et créatif dans tes suggestions.''';
       case AiMode.substitute:
         return '''$base
-MODE: Substitution d\'ingrédients.
+MODE: Substitution d'ingrédients.
 Propose des alternatives détaillées avec ratios et impacts sur le résultat.
-Format: pour chaque substitut indique le ratio, l\'impact gustatif et le meilleur usage.''';
+Format: pour chaque substitut indique le ratio, l'impact gustatif et le meilleur usage.''';
 
       case AiMode.budget:
         return '''$base
 MODE: RECETTES BUDGET — Cuisine économique et savoureuse.
-L\'objectif est de créer des plats délicieux avec un budget très limité.
+L'objectif est de créer des plats délicieux avec un budget très limité.
 
 Règles absolues:
 - Toujours indiquer le coût estimé total et par portion en €
@@ -218,7 +218,7 @@ Format:
       case AiMode.objectif:
         return '''$base
 MODE: RECETTES OBJECTIF PERSONNEL — Cuisine adaptée à tes buts.
-Avant tout, identifie l\'objectif de l\'utilisateur dans sa demande.
+Avant tout, identifie l'objectif de l'utilisateur dans sa demande.
 
 Objectifs possibles:
 - 🏋️ PRISE DE MASSE: riche en protéines (30g+/portion), calories suffisantes, glucides complexes
@@ -233,11 +233,11 @@ Format:
 📊 Macros: Protéines Xg | Glucides Xg | Lipides Xg | Calories Xkcal
 **Ingrédients** avec quantités précises
 **Étapes** de préparation
-💡 **Pourquoi c\'est parfait pour votre objectif ?**''';
+💡 **Pourquoi c'est parfait pour votre objectif ?**''';
 
       case AiMode.vocal:
         return '''$base
-MODE: ASSISTANT VOCAL — L\'utilisateur parle à voix haute.
+MODE: ASSISTANT VOCAL — L'utilisateur parle à voix haute.
 Ses messages sont transcrits et peuvent être approximatifs.
 Sois très compréhensif avec les fautes de transcription.
 Réponds de façon conversationnelle, courte, comme si tu parlais.
@@ -249,9 +249,9 @@ Adapte la longueur de tes réponses : courtes pour les questions simples, détai
 MODE: CHEF PÉDAGOGIQUE — Tu enseignes vraiment la cuisine.
 Pour chaque étape, explique :
 1. LE POURQUOI : la raison scientifique ou culinaire de cette étape
-2. LA TECHNIQUE : comment reconnaître que c\'est bien fait (couleur, texture, son, odeur)
-3. L\'ERREUR CLASSIQUE : ce qui arrive si on rater cette étape
-4. L\'ASTUCE PRO : ce que font les vrais chefs
+2. LA TECHNIQUE : comment reconnaître que c'est bien fait (couleur, texture, son, odeur)
+3. L'ERREUR CLASSIQUE : ce qui arrive si on rater cette étape
+4. L'ASTUCE PRO : ce que font les vrais chefs
 
 Format:
 📚 **[Nom de la technique/recette]**
@@ -1359,10 +1359,12 @@ class _AiAssistantPageState extends State<AiAssistantPage>
   // ══════════════════════════════════════════
   //  BARRE SAISIE — redesign
   // ══════════════════════════════════════════
+  // ── Barre de saisie avec micro intégré (pattern WhatsApp) ──
   Widget _buildInputBar(bool isDark) {
     final surface = isDark ? AppColors.darkSurface : AppColors.surface;
     final bg = isDark ? AppColors.darkBackground : AppColors.background;
     final textDark = isDark ? AppColors.darkTextDark : AppColors.textDark;
+    final hasText = _inputController.text.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -1374,54 +1376,198 @@ class _AiAssistantPageState extends State<AiAssistantPage>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // ── Zone de texte avec micro intégré dedans ──
           Expanded(
             child: Container(
               decoration: BoxDecoration(
                 color: bg,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _selectedMode.color.withValues(alpha: 0.2)),
-              ),
-              child: TextField(
-                controller: _inputController,
-                maxLines: 4, minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-                style: TextStyle(color: textDark, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: _selectedMode.hint,
-                  hintStyle: TextStyle(color: AppColors.textLight, fontSize: 13),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: _isListening
+                      ? Colors.redAccent.withValues(alpha: 0.5)
+                      : _selectedMode.color.withValues(alpha: 0.2),
+                  width: _isListening ? 1.5 : 1,
                 ),
-                onSubmitted: (_) => _sendMessage(),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _inputController,
+                      maxLines: 4, minLines: 1,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: TextStyle(color: textDark, fontSize: 14),
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: _isListening
+                            ? 'Parlez maintenant...'
+                            : _selectedMode.hint,
+                        hintStyle: TextStyle(
+                          color: _isListening
+                              ? Colors.redAccent.withValues(alpha: 0.7)
+                              : AppColors.textLight,
+                          fontSize: 13,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  // ── Micro intégré à droite du champ ──
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6, bottom: 6),
+                    child: AnimatedBuilder(
+                      animation: _pulseController,
+                      builder: (_, __) {
+                        final scale = _isListening
+                            ? 1.0 + 0.12 * _pulseController.value : 1.0;
+                        return GestureDetector(
+                          onTap: _toggleInlineMic,
+                          child: Transform.scale(
+                            scale: scale,
+                            child: Container(
+                              width: 34, height: 34,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _isListening
+                                    ? Colors.redAccent
+                                    : _selectedMode.color.withValues(alpha: 0.12),
+                                boxShadow: _isListening ? [
+                                  BoxShadow(
+                                    color: Colors.redAccent.withValues(alpha: 0.4),
+                                    blurRadius: 10, spreadRadius: 2,
+                                  ),
+                                ] : [],
+                              ),
+                              child: Icon(
+                                _isListening
+                                    ? Icons.stop_rounded
+                                    : Icons.mic_rounded,
+                                size: 18,
+                                color: _isListening
+                                    ? Colors.white
+                                    : _selectedMode.color,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
+          // ── Bouton envoyer ──
           GestureDetector(
-            onTap: _sendMessage,
+            onTap: hasText && !_isLoading ? _sendMessage : null,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 48, height: 48,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_selectedMode.color, _selectedMode.color.withValues(alpha: 0.75)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
-                ),
+                gradient: hasText && !_isLoading
+                    ? LinearGradient(
+                        colors: [_selectedMode.color,
+                            _selectedMode.color.withValues(alpha: 0.75)],
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: hasText && !_isLoading
+                    ? null : AppColors.textLight.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
+                boxShadow: hasText && !_isLoading ? [
                   BoxShadow(color: _selectedMode.color.withValues(alpha: 0.4),
                       blurRadius: 10, offset: const Offset(0, 4)),
-                ],
+                ] : [],
               ),
               child: _isLoading
                   ? const Center(child: SizedBox(width: 20, height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2)))
+                  : Icon(Icons.send_rounded,
+                      color: hasText ? Colors.white : AppColors.textLight,
+                      size: 20),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // ── Toggle micro inline ──────────────────────
+  void _toggleInlineMic() {
+    if (_isListening) {
+      setState(() { _isListening = false; });
+      _pulseController.stop();
+      return;
+    }
+    setState(() { _isListening = true; _inputController.clear(); });
+    _pulseController.repeat(reverse: true);
+    _startInlineSpeechRecognition();
+  }
+
+  void _startInlineSpeechRecognition() {
+    // ignore: avoid_web_libraries_in_flutter
+    try {
+      js.context.callMethod('eval', ['''
+          (function() {
+            window._vocalTranscript = "";
+            window._vocalDone = false;
+            var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SR) { window._vocalDone = true; window._vocalError = "Non supporté"; return; }
+            var r = new SR();
+            r.lang = "fr-FR";
+            r.continuous = true;
+            r.interimResults = true;
+            r.onresult = function(e) {
+              var t = "";
+              for (var i = 0; i < e.results.length; i++) {
+                t += e.results[i][0].transcript;
+              }
+              window._vocalTranscript = t;
+            };
+            r.onend = function() { window._vocalDone = true; };
+            r.onerror = function(e) { window._vocalDone = true; };
+            r.start();
+            window._recognition = r;
+          })();
+        '''
+        ]);
+
+        // Polling toutes les 300ms pour mettre à jour le champ
+        void poll() {
+          if (!mounted) return;
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (!mounted) return;
+            try {
+              final text = js.context['_vocalTranscript'] as String? ?? '';
+              final done = js.context['_vocalDone'] == true;
+              if (text.isNotEmpty) {
+                _inputController.text = text;
+                _inputController.selection = TextSelection.fromPosition(
+                  TextPosition(offset: text.length));
+              }
+              if (done) {
+                if (mounted) setState(() => _isListening = false);
+                _pulseController.stop();
+              } else if (_isListening) {
+                poll();
+              }
+            } catch (_) {}
+          });
+        }
+        poll();
+    } catch (_) {
+      if (mounted) setState(() {
+        _isListening = false;
+        _inputController.text = 'Mode vocal non disponible';
+      });
+      _pulseController.stop();
+    }
   }
 }
 
@@ -1468,39 +1614,43 @@ class _VocalSheetState extends State<_VocalSheet>
   void _startSpeechRecognition() {
     // Utilise Web Speech API (JavaScript)
     try {
-      js.context.callMethod('eval', ['''
-        (function() {
-          if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
-            window._vocalError = "Reconnaissance vocale non supportée";
-            return;
-          }
-          var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-          var recognition = new SR();
-          recognition.lang = "fr-FR";
-          recognition.continuous = false;
-          recognition.interimResults = true;
-          recognition.onresult = function(event) {
-            var t = event.results[event.results.length-1][0].transcript;
-            window._vocalTranscript = t;
-          };
-          recognition.onend = function() {
-            window._vocalDone = true;
-          };
-          recognition.start();
-          window._recognition = recognition;
-        })();
-      ''']);
+      // ignore: avoid_web_libraries_in_flutter
+      {
+        js.context.callMethod('eval', ['''
+          (function() {
+            if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+              window._vocalError = "Reconnaissance vocale non supportée";
+              return;
+            }
+            var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var recognition = new SR();
+            recognition.lang = "fr-FR";
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.onresult = function(event) {
+              var t = event.results[event.results.length-1][0].transcript;
+              window._vocalTranscript = t;
+            };
+            recognition.onend = function() {
+              window._vocalDone = true;
+            };
+            recognition.start();
+            window._recognition = recognition;
+          })();
+        '''
+        ]);
 
-      // Poll for result
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted) {
-          final result = js.context['_vocalTranscript'] as String? ?? '';
-          if (result.isNotEmpty) {
-            setState(() { _transcript = result; _listening = false; });
-            _pulseCtrl.stop();
+        // Poll for result
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) {
+            final result = js.context['_vocalTranscript'] as String? ?? '';
+            if (result.isNotEmpty) {
+              setState(() { _transcript = result; _listening = false; });
+              _pulseCtrl.stop();
+            }
           }
-        }
-      });
+        });
+      }
     } catch (_) {
       setState(() {
         _transcript = 'Mode vocal non disponible sur cette plateforme';
