@@ -27,6 +27,10 @@ class _RecipesListPageState extends State<RecipesListPage>
     with SingleTickerProviderStateMixin {
   String _searchQuery = '';
   String? _selectedCategory;
+  String _sortBy = 'recent'; // recent | duration | rating
+  int? _maxDuration;
+  String? _difficulty;
+  bool _showFilterSheet = false;
   late List<Recipe> _recipes;
   late AnimationController _fabController;
   bool _cloudLoading = false;
@@ -85,20 +89,234 @@ class _RecipesListPageState extends State<RecipesListPage>
   }
 
   List<Recipe> get _filtered {
-    return _recipes.where((r) {
+    var list = _recipes.where((r) {
       final matchSearch =
           r.title.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchCat = _selectedCategory == null ||
           _selectedCategory == 'Tout' ||
           r.category == _selectedCategory;
-      return matchSearch && matchCat;
+      final matchDuration = _maxDuration == null ||
+          r.durationMinutes <= _maxDuration!;
+      return matchSearch && matchCat && matchDuration;
     }).toList();
+
+    // Tri
+    switch (_sortBy) {
+      case 'duration':
+        list.sort((a, b) => a.durationMinutes.compareTo(b.durationMinutes));
+        break;
+      case 'alphabetical':
+        list.sort((a, b) => a.title.compareTo(b.title));
+        break;
+      default: // recent — garder ordre original
+        break;
+    }
+    return list;
   }
+
+  int get _activeFilterCount {
+    int count = 0;
+    if (_selectedCategory != null && _selectedCategory != 'Tout') count++;
+    if (_maxDuration != null) count++;
+    return count;
+  }
+
+  void _clearFilters() => setState(() {
+    _selectedCategory = null;
+    _maxDuration = null;
+    _sortBy = 'recent';
+  });
 
   void _toggleTheme() {
     final isDark = themeNotifier.value == ThemeMode.dark;
     themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
     setState(() {});
+  }
+
+  String get _sortLabel {
+    switch (_sortBy) {
+      case 'duration': return 'Durée ↑';
+      case 'alphabetical': return 'A → Z';
+      default: return 'Récentes';
+    }
+  }
+
+  void _showSortSheet(BuildContext ctx, Color surface) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: surface, borderRadius: BorderRadius.circular(24),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.textLight.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 16),
+          const Text('Trier par', style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 12),
+          for (final opt in [
+            ('recent', '🆕', 'Plus récentes'),
+            ('duration', '⏱️', 'Temps de préparation'),
+            ('alphabetical', '🔤', 'Ordre alphabétique'),
+          ])
+            GestureDetector(
+              onTap: () { setState(() => _sortBy = opt.$1); Navigator.pop(ctx); },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: _sortBy == opt.$1
+                      ? AppColors.primary.withOpacity(0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _sortBy == opt.$1
+                        ? AppColors.primary.withOpacity(0.3)
+                        : AppColors.textLight.withOpacity(0.15),
+                  ),
+                ),
+                child: Row(children: [
+                  Text(opt.$2, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 12),
+                  Text(opt.$3, style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700,
+                      color: _sortBy == opt.$1
+                          ? AppColors.primary : AppColors.textDark)),
+                  if (_sortBy == opt.$1) ...[
+                    const Spacer(),
+                    const Icon(Icons.check_circle_rounded,
+                        color: AppColors.primary, size: 18),
+                  ],
+                ]),
+              ),
+            ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
+  void _showAdvancedFilters(BuildContext ctx, Color surface, Color textMedium) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx2, setInner) => Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: surface, borderRadius: BorderRadius.circular(24),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 40, height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.textLight.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            Row(children: [
+              const Text('Filtres avancés', style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w900)),
+              const Spacer(),
+              if (_activeFilterCount > 0)
+                GestureDetector(
+                  onTap: () { _clearFilters(); Navigator.pop(ctx2); },
+                  child: const Text('Tout effacer',
+                      style: TextStyle(fontSize: 13, color: AppColors.primary,
+                          fontWeight: FontWeight.w700)),
+                ),
+            ]),
+            const SizedBox(height: 20),
+            // Temps de préparation
+            Align(alignment: Alignment.centerLeft,
+              child: const Text('⏱️ Temps de préparation',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800))),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, children: [
+              for (final d in [
+                (null, 'Tous'), (15, '< 15min'), (30, '< 30min'), (60, '< 1h'),
+              ])
+                GestureDetector(
+                  onTap: () => setInner(() => setState(() => _maxDuration = d.$1)),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _maxDuration == d.$1
+                          ? AppColors.primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _maxDuration == d.$1
+                            ? AppColors.primary
+                            : AppColors.textLight.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(d.$2, style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700,
+                        color: _maxDuration == d.$1
+                            ? Colors.white : AppColors.textDark)),
+                  ),
+                ),
+            ]),
+            const SizedBox(height: 20),
+            // Catégorie
+            Align(alignment: Alignment.centerLeft,
+              child: const Text('🏷️ Catégorie',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800))),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final cat in _categories)
+                GestureDetector(
+                  onTap: () => setInner(() =>
+                      setState(() => _selectedCategory = cat)),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: (_selectedCategory ?? 'Tout') == cat
+                          ? AppColors.primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: (_selectedCategory ?? 'Tout') == cat
+                            ? AppColors.primary
+                            : AppColors.textLight.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(cat, style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700,
+                        color: (_selectedCategory ?? 'Tout') == cat
+                            ? Colors.white : AppColors.textDark)),
+                  ),
+                ),
+            ]),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () => Navigator.pop(ctx2),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(child: Text(
+                  'Voir \${_filtered.length} résultat\${_filtered.length > 1 ? "s" : ""}',
+                  style: const TextStyle(color: Colors.white,
+                      fontWeight: FontWeight.w800, fontSize: 15),
+                )),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ]),
+        ),
+      ),
+    );
   }
 
   @override
@@ -368,59 +586,147 @@ class _RecipesListPageState extends State<RecipesListPage>
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // ── FILTRES ────────────────────────
+            // ── FILTRES RAPIDES + BOUTON AVANCÉS ──
             SizedBox(
               height: 36,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 scrollDirection: Axis.horizontal,
-                itemCount: _categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final cat = _categories[i];
-                  final isSelected = (_selectedCategory ?? 'Tout') == cat;
-                  final catColor = cat == 'Tout'
-                      ? AppColors.primary
-                      : AppColors.categoryColor(cat);
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedCategory = cat),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? catColor : surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: isSelected
-                            ? null
-                            : Border.all(color: divider, width: 1),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: catColor.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                )
-                              ]
-                            : [],
-                      ),
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? Colors.white : textMedium,
+                children: [
+                  // Chips catégories
+                  ..._categories.map((cat) {
+                    final isSelected = (_selectedCategory ?? 'Tout') == cat;
+                    final catColor = cat == 'Tout'
+                        ? AppColors.primary
+                        : AppColors.categoryColor(cat);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedCategory = cat),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? catColor : surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: isSelected
+                                ? null
+                                : Border.all(color: divider, width: 1),
+                            boxShadow: isSelected ? [
+                              BoxShadow(color: catColor.withOpacity(0.3),
+                                  blurRadius: 8, offset: const Offset(0, 3)),
+                            ] : [],
+                          ),
+                          child: Text(cat, style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w700,
+                              color: isSelected ? Colors.white : textMedium)),
                         ),
                       ),
+                    );
+                  }),
+                  // Chips durée rapide
+                  ...[
+                    ('⚡ < 15min', 15), ('🕐 < 30min', 30), ('🍳 < 1h', 60),
+                  ].map((t) {
+                    final isSelected = _maxDuration == t.$2;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() =>
+                            _maxDuration = isSelected ? null : t.$2),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(0xFF00BCD4) : surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: isSelected
+                                ? null
+                                : Border.all(color: divider),
+                          ),
+                          child: Text(t.$1, style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w700,
+                              color: isSelected ? Colors.white : textMedium)),
+                        ),
+                      ),
+                    );
+                  }),
+                  // Bouton filtres avancés
+                  GestureDetector(
+                    onTap: () => _showAdvancedFilters(context, surface, textMedium),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _activeFilterCount > 0
+                            ? AppColors.primary : surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _activeFilterCount > 0
+                              ? AppColors.primary : divider),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.tune_rounded, size: 14,
+                            color: _activeFilterCount > 0
+                                ? Colors.white : textMedium),
+                        const SizedBox(width: 4),
+                        Text(
+                          _activeFilterCount > 0
+                              ? 'Filtres (\$_activeFilterCount)' : 'Filtres',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                              color: _activeFilterCount > 0
+                                  ? Colors.white : textMedium),
+                        ),
+                      ]),
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 10),
+            // ── BARRE RÉSULTATS + TRI ──────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: Row(children: [
+                Text('\${_filtered.length} recette\${_filtered.length > 1 ? "s" : ""}',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                        color: textLight)),
+                if (_activeFilterCount > 0) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _clearFilters,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text('✕ Réinitialiser',
+                          style: TextStyle(fontSize: 10, color: AppColors.primary,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _showSortSheet(context, surface),
+                  child: Row(children: [
+                    Icon(Icons.swap_vert_rounded, size: 14, color: textLight),
+                    const SizedBox(width: 4),
+                    Text(_sortLabel, style: TextStyle(
+                        fontSize: 12, color: textLight,
+                        fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ]),
+            ),
+
+            const SizedBox(height: 4),
 
             // ── LISTE ──────────────────────────
             Expanded(
