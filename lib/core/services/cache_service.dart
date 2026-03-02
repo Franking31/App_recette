@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../features/recipes/data/models/recipe.dart';
 import 'recipes_service.dart';
@@ -11,35 +12,38 @@ import 'favorites_service.dart';
 //
 //  Gère :
 //  • Cache local de toutes les données clés
-//  • Détection de connectivité (tentative API)
+//  • Détection de connectivité (ping léger)
 //  • Sync automatique au retour en ligne
 //  • Indicateur visuel d'état connexion
 // ═══════════════════════════════════════════
 
 class CacheService {
   // ── Clés SharedPreferences ────────────────
-  static const _keyRecipes       = 'cache_recipes';
-  static const _keyFavorites     = 'cache_favorites';
-  static const _keyShopping      = 'cache_shopping';
-  static const _keyAiRecipes     = 'cache_ai_recipes';
-  static const _keyLastSync      = 'cache_last_sync';
-  static const _keyIsOnline      = 'cache_is_online';
+  static const _keyRecipes   = 'cache_recipes';
+  static const _keyFavorites = 'cache_favorites';
+  static const _keyShopping  = 'cache_shopping';
+  static const _keyAiRecipes = 'cache_ai_recipes';
+  static const _keyLastSync  = 'cache_last_sync';
+
+  // ── URL de ping (HEAD léger, pas de retour JSON) ──
+  // On ping le backend sans déclencher de logique métier
+  static const _pingUrl = 'https://forkai-backend.onrender.com/api/health';
 
   // ── État global ───────────────────────────
   static bool _isOnline = true;
-  static bool _syncing = false;
+  static bool _syncing  = false;
   static Timer? _connectivityTimer;
 
   // Notifier pour l'UI (bannière hors-ligne)
-  static final ValueNotifier<bool> onlineNotifier = ValueNotifier(true);
+  static final ValueNotifier<bool> onlineNotifier  = ValueNotifier(true);
   static final ValueNotifier<bool> syncingNotifier = ValueNotifier(false);
 
   // ── Initialisation ────────────────────────
   static Future<void> init() async {
     await _checkConnectivity();
-    // Vérifie la connectivité toutes les 10 secondes
+    // Vérifie la connectivité toutes les 30 secondes (était 10s → trop agressif)
     _connectivityTimer = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(seconds: 30),
       (_) => _checkConnectivity(),
     );
   }
@@ -48,18 +52,23 @@ class CacheService {
     _connectivityTimer?.cancel();
   }
 
-  // ── Connectivité (tentative réelle) ───────
+  // ── Connectivité via ping HTTP léger ──────
+  // ✅ CORRIGÉ : on n'appelle plus getCategories() qui déclenchait
+  //    un vrai appel API métier toutes les 10 secondes → risque 429.
+  //    On fait un simple HEAD sur /api/health à la place.
   static Future<void> _checkConnectivity() async {
     try {
-      // On tente un appel léger à l'API
-      await RecipesService.getCategories()
+      final response = await http
+          .head(Uri.parse(_pingUrl))
           .timeout(const Duration(seconds: 5));
+
+      // On considère en ligne si le serveur répond (même 404)
       final wasOffline = !_isOnline;
-      _isOnline = true;
-      onlineNotifier.value = true;
+      _isOnline = response.statusCode < 500;
+      onlineNotifier.value = _isOnline;
 
       // Retour en ligne → sync automatique
-      if (wasOffline && !_syncing) {
+      if (wasOffline && _isOnline && !_syncing) {
         await _autoSync();
       }
     } catch (_) {
@@ -178,8 +187,9 @@ class CacheService {
       final raw = prefs.getString(key);
       if (raw == null) return [];
       final list = jsonDecode(raw) as List;
-      return list.map((j) => Recipe.fromJson(
-          Map<String, dynamic>.from(j))).toList();
+      return list
+          .map((j) => Recipe.fromJson(Map<String, dynamic>.from(j)))
+          .toList();
     } catch (_) {
       return [];
     }
