@@ -306,7 +306,7 @@ class _RecipesListPageState extends State<RecipesListPage>
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(child: Text(
-                  'Voir \${_filtered.length} résultat\${_filtered.length > 1 ? "s" : ""}',
+                  'Voir ${_filtered.length} résultat${_filtered.length > 1 ? "s" : ""}',
                   style: const TextStyle(color: Colors.white,
                       fontWeight: FontWeight.w800, fontSize: 15),
                 )),
@@ -677,7 +677,7 @@ class _RecipesListPageState extends State<RecipesListPage>
                         const SizedBox(width: 4),
                         Text(
                           _activeFilterCount > 0
-                              ? 'Filtres (\$_activeFilterCount)' : 'Filtres',
+                              ? 'Filtres ($_activeFilterCount)' : 'Filtres',
                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
                               color: _activeFilterCount > 0
                                   ? Colors.white : textMedium),
